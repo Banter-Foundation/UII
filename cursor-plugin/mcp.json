@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "uii-layout": {
+      "command": "cargo",
+      "args": [
+        "run",
+        "--quiet",
+        "--manifest-path",
+        "${CURSOR_PLUGIN_ROOT}/Cargo.toml",
+        "--bin",
+        "uii-cursor"
+      ]
+    }
+  }
+}

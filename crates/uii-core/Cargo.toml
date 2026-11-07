@@ -1,0 +1,8 @@
+[package]
+name = "uii-core"
+version = "0.1.0"
+edition = "2021"
+description = "UII design canvas: the document and its HTML and CSS."
+license = "MIT OR Apache-2.0"
+
+[dependencies]

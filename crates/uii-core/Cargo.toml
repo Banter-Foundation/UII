@@ -1,0 +1,8 @@
+[package]
+name = "uii-core"
+version = "0.1.0"
+edition = "2021"
+description = "UII document model, HTML/CSS import, and toolkit import/export."
+license = "MIT OR Apache-2.0"
+
+[dependencies]

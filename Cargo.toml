@@ -1,0 +1,11 @@
+[package]
+name = "uii"
+version = "0.1.0"
+edition = "2021"
+description = "UII Inspect tool. GLFW window, OpenGL 3.3, Dear ImGui docking branch."
+
+[dependencies]
+dear-imgui-glow = "0.22"
+dear-imgui-rs = "0.22"
+glow = "0.18"
+glfw = "0.63"

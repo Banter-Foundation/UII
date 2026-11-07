@@ -426,7 +426,7 @@ fn read_until_close(chars: &[char], i: &mut usize, tag: &str) -> String {
 
 fn read_name(chars: &[char], i: &mut usize) -> String {
     let start = *i;
-    while *i < chars.len() && (chars[*i].is_ascii_alphanumeric() || chars[*i] == '-' || chars[*i] == ':') {
+    while *i < chars.len() && (chars[*i].is_ascii_alphanumeric() || chars[*i] == '-' || chars[*i] == ':' || chars[*i] == '.') {
         *i += 1;
     }
     chars[start..*i].iter().collect()

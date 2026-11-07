@@ -924,91 +924,219 @@ fn skip_string(src: &str, i: usize) -> usize {
     src.len()
 }
 
-fn export_raven(doc: &Document) -> String {
-    let mut xml = String::from("<Window Title=\"Design\">\n");
-    for id in doc.roots() {
-        emit_raven_xml(doc, *id, &mut xml, 1);
+const RAVEN_IMGUI: &str = r#"// Dear ImGui from dear-imgui-rs 0.22 and dear-imgui-glow 0.22, the docking
+// branch Banter uses (https://github.com/Banter-Foundation/Banter).
+// Raven's shell is added onto that Ui. Source: https://github.com/oscar-soirey/Raven
+// commit 7f4411c376cec8fad2d071d63696b8444ec2640d, include/raven/raven_shell.h
+// and include/raven/raven_controls.h. DockArea and Slot.Dock, the header bar,
+// the island, and VBox are Dear ImGui methods. libraven is not linked.
+
+use dear_imgui_rs::{
+    Condition, DockLayout, DockLayoutApply, DockSplit, TableColumnFlags, TableFlags, Ui, WindowKey,
+};
+
+/// Raven's RDockSide. Center is the DockArea child that omits Slot.Dock.
+pub enum DockSide {
+    Left,
+    Right,
+    Top,
+    Bottom,
+    Tab,
+    Center,
+}
+
+pub trait RavenUi {
+    fn dock_area(&self, name: &str, side: DockSide, x: f32, y: f32, w: f32, h: f32, contents: impl FnOnce(&Ui));
+    fn header_bar(&self, title: &str, contents: impl FnOnce(&Ui));
+    fn island(&self, folded: impl FnOnce(&Ui), unfolded: impl FnOnce(&Ui));
+    fn vbox(&self, name: &str, kind: &str, x: f32, y: f32, w: f32, h: f32, contents: impl FnOnce(&Ui));
+    fn raven_label(&self, name: &str, text: &str, x: f32, y: f32, w: f32, h: f32);
+    fn raven_button(&self, name: &str, text: &str, x: f32, y: f32, w: f32, h: f32);
+    fn raven_image(&self, name: &str, source: &str, tex: Option<dear_imgui_rs::texture::TextureId>, x: f32, y: f32, w: f32, h: f32);
+    fn raven_table(&self, name: &str, x: f32, y: f32, w: f32, h: f32, columns: &[&str], rows: &[&[&str]]);
+    fn raven_rectangle(&self, name: &str, x: f32, y: f32, w: f32, h: f32);
+    fn raven_ellipse(&self, name: &str, x: f32, y: f32, w: f32, h: f32);
+}
+
+impl RavenUi for Ui {
+    fn dock_area(&self, name: &str, side: DockSide, x: f32, y: f32, w: f32, h: f32, contents: impl FnOnce(&Ui)) {
+        let key = WindowKey::new(name, name).unwrap();
+        let fill = WindowKey::new("fill", "fill").unwrap();
+        let panel = DockLayout::tabs([&key]);
+        let rest = DockLayout::tabs([&fill]);
+        let layout = match side {
+            DockSide::Left => DockLayout::split(DockSplit::Left, 0.22, panel, rest),
+            DockSide::Right => DockLayout::split(DockSplit::Right, 0.22, panel, rest),
+            DockSide::Top => DockLayout::split(DockSplit::Up, 0.2, panel, rest),
+            DockSide::Bottom => DockLayout::split(DockSplit::Down, 0.2, panel, rest),
+            DockSide::Tab | DockSide::Center => DockLayout::tabs([&key]),
+        };
+        self.dockspace().layout(&layout, DockLayoutApply::IfMissing).build().ok();
+        self.window(&key)
+            .position([x, y], Condition::Always)
+            .size([w, h], Condition::Always)
+            .build(|| contents(self));
     }
-    xml.push_str("</Window>\n");
-    let imgui = export_banter(doc);
+
+    fn header_bar(&self, title: &str, contents: impl FnOnce(&Ui)) {
+        let key = WindowKey::new("header-bar", title).unwrap();
+        self.window(&key)
+            .position([0.0, 0.0], Condition::Always)
+            .size([800.0, 32.0], Condition::Always)
+            .build(|| {
+                self.text(title);
+                let _ = self.button_with_size("-", [24.0, 24.0]);
+                let _ = self.button_with_size("[]", [24.0, 24.0]);
+                let _ = self.button_with_size("x", [24.0, 24.0]);
+                contents(self);
+            });
+    }
+
+    fn island(&self, folded: impl FnOnce(&Ui), unfolded: impl FnOnce(&Ui)) {
+        self.child_window("island").size([160.0, 28.0]).build(self, || folded(self));
+        if self.is_item_hovered() {
+            self.child_window("island-open").size([260.0, 80.0]).build(self, || unfolded(self));
+        }
+    }
+
+    fn vbox(&self, name: &str, _kind: &str, x: f32, y: f32, w: f32, h: f32, contents: impl FnOnce(&Ui)) {
+        self.set_cursor_pos([x, y]);
+        self.child_window(name).size([w, h]).build(self, || contents(self));
+    }
+
+    fn raven_label(&self, _name: &str, text: &str, x: f32, y: f32, w: f32, h: f32) {
+        self.set_cursor_pos([x, y]);
+        self.dummy([w, h]);
+        self.set_cursor_pos([x, y]);
+        self.text(text);
+    }
+
+    fn raven_button(&self, _name: &str, text: &str, x: f32, y: f32, w: f32, h: f32) {
+        self.set_cursor_pos([x, y]);
+        let _ = self.button_with_size(text, [w, h]);
+    }
+
+    fn raven_image(&self, _name: &str, _source: &str, tex: Option<dear_imgui_rs::texture::TextureId>, x: f32, y: f32, w: f32, h: f32) {
+        self.set_cursor_pos([x, y]);
+        self.dummy([w, h]);
+        if let Some(tex) = tex {
+            self.image(tex, [w, h]);
+        }
+    }
+
+    fn raven_table(&self, name: &str, x: f32, y: f32, w: f32, h: f32, columns: &[&str], rows: &[&[&str]]) {
+        self.set_cursor_pos([x, y]);
+        if let Some(_table) = self.begin_table_with_sizing(name, columns.len().max(1), TableFlags::BORDERS, [w, h], 0.0) {
+            for column in columns {
+                self.table_setup_column(column, TableColumnFlags::WIDTH_STRETCH, None);
+            }
+            self.table_headers_row();
+            for row in rows {
+                self.table_next_row();
+                for cell in *row {
+                    self.table_next_column();
+                    self.text(cell);
+                }
+            }
+        }
+    }
+
+    fn raven_rectangle(&self, _name: &str, x: f32, y: f32, w: f32, h: f32) {
+        self.set_cursor_pos([x, y]);
+        self.dummy([w, h]);
+        self.get_window_draw_list().add_rect_filled_multicolor([x, y], [x + w, y + h], 0, 0, 0, 0);
+    }
+
+    fn raven_ellipse(&self, _name: &str, x: f32, y: f32, w: f32, h: f32) {
+        self.set_cursor_pos([x, y]);
+        self.dummy([w, h]);
+        self.get_window_draw_list().add_ellipse_filled([x, y], [w, h], 0, 0.0, 24);
+    }
+}
+"#;
+
+fn export_raven(doc: &Document) -> String {
+    let mut body = String::new();
+    for id in doc.roots() {
+        emit_raven_ui(doc, *id, &mut body, 1);
+    }
     format!(
-        "// Custom imgui for this layout.\n\
-// Dear ImGui is dear-imgui-rs 0.22 and dear-imgui-glow 0.22, the same crates\n\
-// and docking branch Banter uses (https://github.com/Banter-Foundation/Banter).\n\
-// Raven features follow https://github.com/oscar-soirey/Raven\n\
-// commit 7f4411c376cec8fad2d071d63696b8444ec2640d:\n\
-// DockArea with Slot.Dock, VBox, Table, Button, Label, and Image\n\
-// (include/raven/raven_shell.h and raven_controls.h).\n\
-// The XML is that Raven window. The Rust below draws the same layout with\n\
-// Banter's Dear ImGui. libraven is not linked into the designer.\n\n\
-use raven::window_from_xml;\n\n\
-pub fn raven_window() -> raven::Rid {{\n    \
-unsafe {{ window_from_xml(r###\"{xml}\"###) }}\n\
-}}\n\n\
-{imgui}"
+        "{RAVEN_IMGUI}\npub fn draw(ui: &Ui, mut image: impl FnMut(&str) -> Option<dear_imgui_rs::texture::TextureId>) {{\n{body}}}\n"
     )
 }
 
-fn emit_raven_xml(doc: &Document, id: NodeId, out: &mut String, depth: usize) {
+fn emit_raven_ui(doc: &Document, id: NodeId, out: &mut String, depth: usize) {
+    let pad = "    ".repeat(depth);
     let node = doc.node(id);
-    let pad = "  ".repeat(depth);
-    let (tag, extra) = match node.kind {
-        NodeKind::Dock => ("DockArea", String::new()),
-        NodeKind::Frame => ("VBox", " UiiKind=\"frame\"".to_string()),
-        NodeKind::Child => ("VBox", " UiiKind=\"child\"".to_string()),
-        NodeKind::Text => ("Label", format!(" Text=\"{}\"", xml_escape(&node.text))),
-        NodeKind::Button => ("Button", format!(" Text=\"{}\"", xml_escape(&node.text))),
-        NodeKind::Image => ("Image", format!(" Source=\"{}\"", xml_escape(&node.image_src))),
-        NodeKind::Table => ("Table", String::new()),
-        NodeKind::Rectangle => ("Rectangle", String::new()),
-        NodeKind::Ellipse => ("Ellipse", String::new()),
-    };
-    let slot = match (node.kind, node.dock_slot) {
-        (NodeKind::Dock, Some(slot)) if slot != DockSlot::Center => {
-            let name = match slot {
+    let name = scan::rust_string(&node.name);
+    let x = scan::num(node.rect.x);
+    let y = scan::num(node.rect.y);
+    let w = scan::num(node.rect.width);
+    let h = scan::num(node.rect.height);
+    let children = doc.children(id).to_vec();
+    match node.kind {
+        NodeKind::Dock => {
+            let side = match node.dock_slot.unwrap_or(DockSlot::Center) {
                 DockSlot::Top => "Top",
                 DockSlot::Bottom => "Bottom",
                 DockSlot::Left => "Left",
                 DockSlot::Right => "Right",
-                DockSlot::Center => "Tab",
+                DockSlot::Center => "Center",
             };
-            format!(" Slot.Dock=\"{name}\"")
+            out.push_str(&format!(
+                "{pad}ui.dock_area({name}, DockSide::{side}, {x}, {y}, {w}, {h}, |ui| {{\n"
+            ));
+            for child in children {
+                emit_raven_ui(doc, child, out, depth + 1);
+            }
+            out.push_str(&format!("{pad}}});\n"));
         }
-        _ => String::new(),
-    };
-    let open = format!(
-        "{pad}<{tag} Name=\"{}\"{extra}{slot} X=\"{}\" Y=\"{}\" Width=\"{}\" Height=\"{}\"",
-        xml_escape(&node.name),
-        scan::num(node.rect.x),
-        scan::num(node.rect.y),
-        scan::num(node.rect.width),
-        scan::num(node.rect.height)
-    );
-    if node.kind == NodeKind::Table {
-        out.push_str(&open);
-        out.push_str(">\n");
-        for column in &node.columns {
-            out.push_str(&format!("{pad}  <Column Header=\"{}\"/>\n", xml_escape(column)));
+        NodeKind::Frame | NodeKind::Child => {
+            let kind = if node.kind == NodeKind::Frame { "frame" } else { "child" };
+            out.push_str(&format!(
+                "{pad}ui.vbox({name}, \"{kind}\", {x}, {y}, {w}, {h}, |ui| {{\n"
+            ));
+            for child in children {
+                emit_raven_ui(doc, child, out, depth + 1);
+            }
+            out.push_str(&format!("{pad}}});\n"));
         }
-        for row in &node.rows {
-            let cells = row.iter().map(|cell| xml_escape(cell)).collect::<Vec<_>>().join("|");
-            out.push_str(&format!("{pad}  <Row>{cells}</Row>\n"));
+        NodeKind::Text => {
+            out.push_str(&format!(
+                "{pad}ui.raven_label({name}, {}, {x}, {y}, {w}, {h});\n",
+                scan::rust_string(&node.text)
+            ));
         }
-        out.push_str(&format!("{pad}</Table>\n"));
-        return;
+        NodeKind::Button => {
+            out.push_str(&format!(
+                "{pad}ui.raven_button({name}, {}, {x}, {y}, {w}, {h});\n",
+                scan::rust_string(&node.text)
+            ));
+        }
+        NodeKind::Image => {
+            let src = scan::rust_string(&node.image_src);
+            out.push_str(&format!(
+                "{pad}ui.raven_image({name}, {src}, image({src}), {x}, {y}, {w}, {h});\n"
+            ));
+        }
+        NodeKind::Table => {
+            out.push_str(&format!(
+                "{pad}ui.raven_table({name}, {x}, {y}, {w}, {h}, &{}, &[{}]);\n",
+                string_list(&node.columns),
+                node.rows
+                    .iter()
+                    .map(|row| format!("&{}", string_list(row)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+        NodeKind::Rectangle => {
+            out.push_str(&format!("{pad}ui.raven_rectangle({name}, {x}, {y}, {w}, {h});\n"));
+        }
+        NodeKind::Ellipse => {
+            out.push_str(&format!("{pad}ui.raven_ellipse({name}, {x}, {y}, {w}, {h});\n"));
+        }
     }
-    let children = doc.children(id).to_vec();
-    if children.is_empty() {
-        out.push_str(&open);
-        out.push_str("/>\n");
-        return;
-    }
-    out.push_str(&open);
-    out.push_str(">\n");
-    for child in children {
-        emit_raven_xml(doc, child, out, depth + 1);
-    }
-    out.push_str(&format!("{pad}</{tag}>\n"));
 }
 
 fn string_list(items: &[String]) -> String {
@@ -1016,89 +1144,127 @@ fn string_list(items: &[String]) -> String {
     format!("[{inner}]")
 }
 
+const RAVEN_CALLS: &[&str] = &[
+    "ui.dock_area",
+    "ui.header_bar",
+    "ui.island",
+    "ui.vbox",
+    "ui.raven_label",
+    "ui.raven_button",
+    "ui.raven_image",
+    "ui.raven_table",
+    "ui.raven_rectangle",
+    "ui.raven_ellipse",
+];
+
 fn import_raven(src: &str) -> Document {
     let mut doc = Document::new("Imported");
-    walk_raven_xml(&mut doc, None, &html::parse_markup(raven_xml(src)));
+    let body = src
+        .find("pub fn draw")
+        .map(|start| &src[start..])
+        .unwrap_or(src);
+    walk_raven_ui(&mut doc, None, body);
     doc
 }
 
-fn raven_xml(src: &str) -> &str {
-    let start = src.find("<Window").or_else(|| src.find("<window")).unwrap_or(0);
-    let rest = &src[start..];
-    if let Some(end) = rest.find("</Window>") {
-        return &rest[..end + "</Window>".len()];
+fn walk_raven_ui(doc: &mut Document, parent: Option<NodeId>, src: &str) {
+    let mut i = 0;
+    while i < src.len() {
+        if let Some(path) = longest_path(src, i, RAVEN_CALLS) {
+            if let Some((_, args, end)) = scan::read_call(src, i) {
+                let strings = scan::strings(&args);
+                let nums = scan::nums(&args);
+                let named = |index: usize, fallback: &str| {
+                    strings.get(index).cloned().unwrap_or_else(|| fallback.to_string())
+                };
+                match path {
+                    "ui.dock_area" => {
+                        let (x, y, w, h) = quad(&nums, 0);
+                        let id = add_node(doc, parent, NodeKind::Dock, &named(0, "dock"), x, y, w, h);
+                        let side = args.iter().find_map(|arg| match arg {
+                            Arg::Ident(text) => Some(text.as_str()),
+                            _ => None,
+                        });
+                        let slot = match side.map(|text| text.rsplit("::").next().unwrap_or(text)) {
+                            Some("Top") => DockSlot::Top,
+                            Some("Bottom") => DockSlot::Bottom,
+                            Some("Left") => DockSlot::Left,
+                            Some("Right") => DockSlot::Right,
+                            _ => DockSlot::Center,
+                        };
+                        doc.set_dock_slot(id, slot);
+                        if let Some(body) = scan::body_of(&args) {
+                            walk_raven_ui(doc, Some(id), body);
+                        }
+                    }
+                    "ui.header_bar" => {
+                        let id = add_node(doc, parent, NodeKind::Dock, &named(0, "header"), 0.0, 0.0, 800.0, 32.0);
+                        doc.set_dock_slot(id, DockSlot::Top);
+                        if let Some(body) = scan::body_of(&args) {
+                            walk_raven_ui(doc, Some(id), body);
+                        }
+                    }
+                    "ui.vbox" => {
+                        let (x, y, w, h) = quad(&nums, 0);
+                        let kind = if strings.get(1).map(|item| item == "frame").unwrap_or(false) {
+                            NodeKind::Frame
+                        } else {
+                            NodeKind::Child
+                        };
+                        let id = add_node(doc, parent, kind, &named(0, "vbox"), x, y, w, h);
+                        if let Some(body) = scan::body_of(&args) {
+                            walk_raven_ui(doc, Some(id), body);
+                        }
+                    }
+                    "ui.island" => {
+                        let id = add_node(doc, parent, NodeKind::Frame, "island", 0.0, 0.0, 260.0, 80.0);
+                        for arg in &args {
+                            if let Arg::Body(body) = arg {
+                                walk_raven_ui(doc, Some(id), body);
+                            }
+                        }
+                    }
+                    "ui.raven_label" | "ui.raven_button" => {
+                        let (x, y, w, h) = quad(&nums, 0);
+                        let kind = if path.ends_with("button") { NodeKind::Button } else { NodeKind::Text };
+                        let id = add_node(doc, parent, kind, &named(0, "label"), x, y, w, h);
+                        doc.set_text(id, named(1, ""));
+                    }
+                    "ui.raven_image" => {
+                        let (x, y, w, h) = quad(&nums, 0);
+                        let id = add_node(doc, parent, NodeKind::Image, &named(0, "image"), x, y, w, h);
+                        doc.set_image(id, named(1, ""));
+                    }
+                    "ui.raven_table" => {
+                        let (x, y, w, h) = quad(&nums, 0);
+                        let id = add_node(doc, parent, NodeKind::Table, &named(0, "table"), x, y, w, h);
+                        let columns = args.iter().find_map(|arg| match arg {
+                            Arg::List(items) if items.iter().all(|item| matches!(item, Arg::Str(_))) => {
+                                Some(list_strings(arg))
+                            }
+                            _ => None,
+                        }).unwrap_or_default();
+                        let rows = args.iter().find_map(|arg| match arg {
+                            Arg::List(items) if items.iter().any(|item| matches!(item, Arg::List(_))) => {
+                                Some(list_rows(arg))
+                            }
+                            _ => None,
+                        }).unwrap_or_default();
+                        doc.set_table(id, columns, rows);
+                    }
+                    "ui.raven_rectangle" | "ui.raven_ellipse" => {
+                        let (x, y, w, h) = quad(&nums, 0);
+                        let kind = if path.ends_with("ellipse") { NodeKind::Ellipse } else { NodeKind::Rectangle };
+                        add_node(doc, parent, kind, &named(0, "shape"), x, y, w, h);
+                    }
+                    _ => {}
+                }
+                i = end;
+                continue;
+            }
+        }
+        i += 1;
     }
-    if let Some(end) = rest.find("</window>") {
-        return &rest[..end + "</window>".len()];
-    }
-    rest
-}
-
-fn walk_raven_xml(doc: &mut Document, parent: Option<NodeId>, nodes: &[MarkupNode]) {
-    for node in nodes {
-        if node.tag == "window" {
-            walk_raven_xml(doc, parent, &node.children);
-            continue;
-        }
-        if node.tag == "column" || node.tag == "row" {
-            continue;
-        }
-        let kind = match node.tag.as_str() {
-            "dockarea" => NodeKind::Dock,
-            "vbox" => match markup_attr(node, "uiikind").as_deref() {
-                Some("frame") => NodeKind::Frame,
-                _ => NodeKind::Child,
-            },
-            "label" => NodeKind::Text,
-            "button" => NodeKind::Button,
-            "image" => NodeKind::Image,
-            "table" => NodeKind::Table,
-            "rectangle" => NodeKind::Rectangle,
-            "ellipse" => NodeKind::Ellipse,
-            _ => continue,
-        };
-        let name = markup_attr(node, "name").unwrap_or_else(|| node.tag.clone());
-        let x = attr_f32(node, "x", 0.0);
-        let y = attr_f32(node, "y", 0.0);
-        let w = attr_f32(node, "width", 1.0);
-        let h = attr_f32(node, "height", 1.0);
-        let id = add_node(doc, parent, kind, &name, x, y, w, h);
-        if matches!(kind, NodeKind::Text | NodeKind::Button) {
-            let text = markup_attr(node, "text").unwrap_or_else(|| node.text.clone());
-            doc.set_text(id, text);
-        }
-        if kind == NodeKind::Image {
-            doc.set_image(id, markup_attr(node, "source").unwrap_or_default());
-        }
-        if kind == NodeKind::Dock {
-            let slot = markup_attr(node, "slot.dock")
-                .as_deref()
-                .map(|value| if value.eq_ignore_ascii_case("tab") { "center" } else { value })
-                .and_then(DockSlot::parse)
-                .unwrap_or(DockSlot::Center);
-            doc.set_dock_slot(id, slot);
-        }
-        if kind == NodeKind::Table {
-            let columns = node
-                .children
-                .iter()
-                .filter(|child| child.tag == "column")
-                .map(|child| markup_attr(child, "header").unwrap_or_default())
-                .collect();
-            let rows = node
-                .children
-                .iter()
-                .filter(|child| child.tag == "row")
-                .map(|child| split_cells(&child.text))
-                .collect();
-            doc.set_table(id, columns, rows);
-        }
-        walk_raven_xml(doc, Some(id), &node.children);
-    }
-}
-
-fn attr_f32(node: &MarkupNode, name: &str, fallback: f32) -> f32 {
-    markup_attr(node, name).and_then(|value| value.parse().ok()).unwrap_or(fallback)
 }
 
 

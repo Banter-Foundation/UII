@@ -65,7 +65,7 @@ Import and Export are buttons on the tool row. Every format can be imported and 
 
 Qt is **Qt Widgets**, not QML. The export says so. Docking is `QDockWidget` on a `QMainWindow`, tables are `QTableWidget`, and nested boxes are child `QWidget`s.
 
-Raven is [oscar-soirey/Raven](https://github.com/oscar-soirey/Raven), commit `7f4411c376cec8fad2d071d63696b8444ec2640d`. It is a C GUI library (Vulkan, its own windows), not a crate inside Banter and not a Dear ImGui fork. The custom export follows that source: a Raven window loaded with `window_from_xml`, using `DockArea` and `Slot.Dock`, `VBox`, `Table`, `Button`, `Label`, and `Image` (`include/raven/raven_shell.h`, `include/raven/raven_controls.h`, `bindings/rust`). The same file then draws that layout with `dear-imgui-rs` 0.22 and `dear-imgui-glow` 0.22, the crates and docking branch Banter uses. The running editor links those crates only. It does not link `libraven`.
+Raven is [oscar-soirey/Raven](https://github.com/oscar-soirey/Raven), commit `7f4411c376cec8fad2d071d63696b8444ec2640d`. It is a C GUI library, not a Dear ImGui fork and not a crate inside Banter. The custom export is Banter's Dear ImGui (`dear-imgui-rs` 0.22 and `dear-imgui-glow` 0.22, the docking branch) with Raven's shell added onto `Ui`: `dock_area` (`RDockSide` / `Slot.Dock`), `header_bar`, `island`, and `vbox`, plus label, button, image, and table. Those methods are implemented with Dear ImGui's dockspace, windows, child windows, and tables (`include/raven/raven_shell.h`, `include/raven/raven_controls.h`). The running editor links Banter's crates only. It does not link `libraven`.
 
 Where the toolkit has no dock widget, the export still carries the layout and names the closest equivalent:
 
@@ -79,7 +79,7 @@ Where the toolkit has no dock widget, the export still carries the layout and na
 
 HTML regions become docks, HTML tables become tables, and nested boxes become child windows. Text, buttons, images, and frames are included, and so are rectangles and ellipses drawn on the canvas.
 
-Banter import reads the Dear ImGui calls that export emits. Raven import reads the Raven XML (`DockArea`, `VBox`, `Table`, `Button`, `Label`, `Image`). Slint and WinUI imports read their own files. The other native imports read the `uii_dock`, `uii_frame`, `uii_child`, `uii_text`, `uii_button`, `uii_image`, `uii_table`, `uii_rectangle`, and `uii_ellipse` calls that UII writes next to the toolkit notes. They do not parse arbitrary egui, Qt, Swift, GTK, or Compose source.
+Banter import reads the Dear ImGui calls that export emits. Raven import reads the Dear ImGui methods added from Raven (`ui.dock_area`, `ui.vbox`, `ui.raven_label`, `ui.raven_button`, `ui.raven_table`, `ui.raven_image`). Slint and WinUI imports read their own files. The other native imports read the `uii_dock`, `uii_frame`, `uii_child`, `uii_text`, `uii_button`, `uii_image`, `uii_table`, `uii_rectangle`, and `uii_ellipse` calls that UII writes next to the toolkit notes. They do not parse arbitrary egui, Qt, Swift, GTK, or Compose source.
 
 ## Cursor
 
@@ -106,4 +106,4 @@ EOF
 - There is no undo, no save file, and no collaboration.
 - Animation keys are only x, y, width, and height.
 - Imports of egui, Qt Widgets, SwiftUI, GTK, Compose, and Dear ImGui C++ accept UII's emitted calls, not a handwritten app.
-- Raven's own renderer is not linked. The export writes Raven's XML and a Dear ImGui 0.22 drawing of the same layout. Rectangles and ellipses are canvas shapes; Raven's headers do not name those two widgets.
+- Raven's Vulkan renderer is not linked. DockArea, the header bar, the island, and VBox are methods on Banter's Dear ImGui 0.22. Rectangles and ellipses stay canvas shapes.

@@ -108,8 +108,12 @@ Inspect is a tool, not a tab. When something is selected, the tool shows its siz
 
 So to be clear about what I mean about dearimgui with raven features I mean this raven( https://github.com/oscar-soirey/Raven) and I want you to download the source and use that as reference material for the custom imgui be sure to use the same imgui version/fork as banter
 
+So to be clear you used raven to upgrade imgui/ add ravens special features to imgui
+
+Nope
+
 ## Summary
 
 The running app is a native Rust window on Banter's Dear ImGui stack. HTML and CSS are the layout model, and the canvas is the editor. Design and Animation are the only top tabs. Inspect is a tool that reports type, size, and color. Assets and Components are in the Content drawer. Import and export cover the fifteen formats. Cursor talks to the open window through a local socket, not HTTP. Raven was not found in Banter, so that export is generated Rust on dear-imgui-rs. Qt is Widgets, not QML.
 
-Raven is https://github.com/oscar-soirey/Raven at commit 7f4411c376cec8fad2d071d63696b8444ec2640d. The custom export writes that library's XML and draws the same layout with Banter's dear-imgui-rs 0.22. The designer does not link libraven.
+Raven is https://github.com/oscar-soirey/Raven at commit 7f4411c376cec8fad2d071d63696b8444ec2640d. The custom export adds Raven's DockArea, header bar, island, and VBox onto Banter's dear-imgui-rs 0.22. The designer does not link libraven.

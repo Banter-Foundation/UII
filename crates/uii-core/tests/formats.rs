@@ -200,15 +200,17 @@ fn every_export_round_trips_docking_tables_children_and_shapes() {
             "raven-imgui" => {
                 assert!(source.contains("dear-imgui-rs 0.22"));
                 assert!(source.contains("oscar-soirey/Raven"));
-                assert!(source.contains("window_from_xml"));
-                assert!(source.contains("<DockArea"));
-                assert!(source.contains("Slot.Dock=\"Top\""));
-                assert!(source.contains("<Table"));
-                assert!(source.contains("<VBox"));
+                assert!(source.contains("trait RavenUi"));
+                assert!(source.contains("fn dock_area"));
+                assert!(source.contains("fn header_bar"));
+                assert!(source.contains("fn island"));
+                assert!(source.contains("fn vbox"));
+                assert!(source.contains("DockSide::Top"));
+                assert!(source.contains("ui.dock_area"));
+                assert!(source.contains("ui.vbox"));
+                assert!(source.contains("begin_table_with_sizing"));
                 assert!(source.contains("dear_imgui_rs"));
-                assert!(source.contains("DockLayout"));
-                assert!(source.contains("begin_table"));
-                assert!(!source.contains("R_BACKEND_VULKAN"));
+                assert!(!source.contains("window_from_xml"));
             }
             "imgui-cpp" => {
                 assert!(source.contains("DockBuilderSplitNode") || source.contains("DockSpace"));
@@ -302,25 +304,18 @@ fn handwritten_banter_imgui_imports() {
 
 #[test]
 fn handwritten_raven_imgui_imports() {
-    let src = r##"
-        use raven::window_from_xml;
-        let _window = unsafe { window_from_xml(r#"
-            <Window Title="Design">
-              <DockArea Name="Header" Slot.Dock="Top" X="0" Y="0" Width="400" Height="48">
-                <Label Name="title" Text="Title" X="8" Y="8" Width="40" Height="16"/>
-              </DockArea>
-              <VBox Name="Card" UiiKind="child" X="10" Y="60" Width="100" Height="40">
-                <Button Name="Save" Text="Save" X="4" Y="4" Width="50" Height="20"/>
-              </VBox>
-              <Table Name="People" X="0" Y="110" Width="180" Height="60">
-                <Column Header="Name"/>
-                <Column Header="Role"/>
-                <Row>Ada|Admin</Row>
-              </Table>
-              <Image Name="Logo" Source="logo.png" X="0" Y="180" Width="16" Height="16"/>
-            </Window>
-        "#) };
-    "##;
+    let src = r#"
+        pub fn draw(ui: &Ui) {
+            ui.dock_area("Header", DockSide::Top, 0.0, 0.0, 400.0, 48.0, |ui| {
+                ui.raven_label("title", "Title", 8.0, 8.0, 40.0, 16.0);
+            });
+            ui.vbox("Card", "child", 10.0, 60.0, 100.0, 40.0, |ui| {
+                ui.raven_button("Save", "Save", 4.0, 4.0, 50.0, 20.0);
+            });
+            ui.raven_table("People", 0.0, 110.0, 180.0, 60.0, &["Name", "Role"], &[&["Ada", "Admin"]]);
+            ui.raven_image("Logo", "logo.png", image("logo.png"), 0.0, 180.0, 16.0, 16.0);
+        }
+    "#;
     let doc = import_source("raven-imgui", src).unwrap();
     let header = doc.find_named("Header").unwrap();
     assert_eq!(header.kind, NodeKind::Dock);

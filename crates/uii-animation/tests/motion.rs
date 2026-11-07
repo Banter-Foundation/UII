@@ -711,6 +711,8 @@ fn animation_tab_draws_a_frame_without_a_window() {
         project.add_target("Header");
     });
     let mut ctx = dear_imgui_rs::Context::create();
+    ctx.set_ini_filename::<std::path::PathBuf>(None)
+        .expect("disable imgui.ini");
     ctx.io_mut().set_display_size([1280.0, 720.0]);
     ctx.io_mut().set_delta_time(1.0 / 60.0);
     ctx.font_atlas()

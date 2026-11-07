@@ -112,8 +112,10 @@ So to be clear you used raven to upgrade imgui/ add ravens special features to i
 
 Nope
 
+We aren’t doing it that way please do it the way I asked which was adding stuff to imgui for export and import not the app ui
+
 ## Summary
 
 The running app is a native Rust window on Banter's Dear ImGui stack. HTML and CSS are the layout model, and the canvas is the editor. Design and Animation are the only top tabs. Inspect is a tool that reports type, size, and color. Assets and Components are in the Content drawer. Import and export cover the fifteen formats. Cursor talks to the open window through a local socket, not HTTP. Raven was not found in Banter, so that export is generated Rust on dear-imgui-rs. Qt is Widgets, not QML.
 
-Raven is https://github.com/oscar-soirey/Raven at commit 7f4411c376cec8fad2d071d63696b8444ec2640d. The custom export adds Raven's DockArea, header bar, island, and VBox onto Banter's dear-imgui-rs 0.22. The designer does not link libraven.
+Raven is https://github.com/oscar-soirey/Raven at commit 7f4411c376cec8fad2d071d63696b8444ec2640d. Those features are functions in the exported Dear ImGui file, and import reads them. The editor window does not call them and does not link libraven.

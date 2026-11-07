@@ -9,3 +9,7 @@ The custom imgui export now follows oscar-soirey/Raven at commit 7f4411c376cec8f
 ## 2026-11-07 14:02:01 -0600 [Cursor Agent] — Raven features on Dear ImGui
 
 The custom export is Banter's Dear ImGui 0.22 with Raven's shell added onto `Ui`: `dock_area`, `header_bar`, `island`, and `vbox`, plus label, button, image, and table. Those methods are implemented with Dear ImGui's dockspace, windows, and tables. libraven is not linked.
+
+## 2026-11-07 14:07:09 -0600 [Cursor Agent] — Raven stays in export and import
+
+Raven's DockArea, header bar, island, and VBox are functions in the exported Dear ImGui file. Import reads those functions back onto the canvas. The editor window does not compile or call them.

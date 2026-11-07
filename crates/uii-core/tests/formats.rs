@@ -200,17 +200,18 @@ fn every_export_round_trips_docking_tables_children_and_shapes() {
             "raven-imgui" => {
                 assert!(source.contains("dear-imgui-rs 0.22"));
                 assert!(source.contains("oscar-soirey/Raven"));
-                assert!(source.contains("trait RavenUi"));
-                assert!(source.contains("fn dock_area"));
-                assert!(source.contains("fn header_bar"));
-                assert!(source.contains("fn island"));
-                assert!(source.contains("fn vbox"));
+                assert!(source.contains("fn imgui_dock_area"));
+                assert!(source.contains("fn imgui_header_bar"));
+                assert!(source.contains("fn imgui_island"));
+                assert!(source.contains("fn imgui_vbox"));
                 assert!(source.contains("DockSide::Top"));
-                assert!(source.contains("ui.dock_area"));
-                assert!(source.contains("ui.vbox"));
+                assert!(source.contains("imgui_dock_area(ui"));
+                assert!(source.contains("imgui_vbox(ui"));
                 assert!(source.contains("begin_table_with_sizing"));
+                assert!(source.contains("exported_layout"));
                 assert!(source.contains("dear_imgui_rs"));
                 assert!(!source.contains("window_from_xml"));
+                assert!(!source.contains("RavenUi"));
             }
             "imgui-cpp" => {
                 assert!(source.contains("DockBuilderSplitNode") || source.contains("DockSpace"));
@@ -305,15 +306,15 @@ fn handwritten_banter_imgui_imports() {
 #[test]
 fn handwritten_raven_imgui_imports() {
     let src = r#"
-        pub fn draw(ui: &Ui) {
-            ui.dock_area("Header", DockSide::Top, 0.0, 0.0, 400.0, 48.0, |ui| {
-                ui.raven_label("title", "Title", 8.0, 8.0, 40.0, 16.0);
+        pub fn exported_layout(ui: &Ui) {
+            imgui_dock_area(ui, "Header", DockSide::Top, 0.0, 0.0, 400.0, 48.0, |ui| {
+                imgui_label(ui, "title", "Title", 8.0, 8.0, 40.0, 16.0);
             });
-            ui.vbox("Card", "child", 10.0, 60.0, 100.0, 40.0, |ui| {
-                ui.raven_button("Save", "Save", 4.0, 4.0, 50.0, 20.0);
+            imgui_vbox(ui, "Card", "child", 10.0, 60.0, 100.0, 40.0, |ui| {
+                imgui_button(ui, "Save", "Save", 4.0, 4.0, 50.0, 20.0);
             });
-            ui.raven_table("People", 0.0, 110.0, 180.0, 60.0, &["Name", "Role"], &[&["Ada", "Admin"]]);
-            ui.raven_image("Logo", "logo.png", image("logo.png"), 0.0, 180.0, 16.0, 16.0);
+            imgui_table(ui, "People", 0.0, 110.0, 180.0, 60.0, &["Name", "Role"], &[&["Ada", "Admin"]]);
+            imgui_image(ui, "Logo", "logo.png", image("logo.png"), 0.0, 180.0, 16.0, 16.0);
         }
     "#;
     let doc = import_source("raven-imgui", src).unwrap();
@@ -327,6 +328,17 @@ fn handwritten_raven_imgui_imports() {
     assert_eq!(table.columns, vec!["Name".to_string(), "Role".to_string()]);
     assert_eq!(table.rows, vec![vec!["Ada".to_string(), "Admin".to_string()]]);
     assert_eq!(doc.find_named("Logo").unwrap().image_src, "logo.png");
+}
+
+#[test]
+fn raven_additions_stay_out_of_the_application_window() {
+    let view = include_str!("../../uii/src/view.rs");
+    let platform = include_str!("../../uii/src/platform.rs");
+    for source in [view, platform] {
+        assert!(!source.contains("imgui_dock_area"));
+        assert!(!source.contains("exported_layout"));
+        assert!(!source.contains("RavenUi"));
+    }
 }
 
 #[test]

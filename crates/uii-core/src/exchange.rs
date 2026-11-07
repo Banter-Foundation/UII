@@ -924,12 +924,15 @@ fn skip_string(src: &str, i: usize) -> usize {
     src.len()
 }
 
-const RAVEN_IMGUI: &str = r#"// Dear ImGui from dear-imgui-rs 0.22 and dear-imgui-glow 0.22, the docking
-// branch Banter uses (https://github.com/Banter-Foundation/Banter).
-// Raven's shell is added onto that Ui. Source: https://github.com/oscar-soirey/Raven
-// commit 7f4411c376cec8fad2d071d63696b8444ec2640d, include/raven/raven_shell.h
-// and include/raven/raven_controls.h. DockArea and Slot.Dock, the header bar,
-// the island, and VBox are Dear ImGui methods. libraven is not linked.
+const RAVEN_IMGUI: &str = r#"// Exported Dear ImGui. This is not the UII window.
+// dear-imgui-rs 0.22 and dear-imgui-glow 0.22, the docking branch Banter uses
+// (https://github.com/Banter-Foundation/Banter).
+// The functions below are added to that imgui for export and import.
+// They follow https://github.com/oscar-soirey/Raven
+// commit 7f4411c376cec8fad2d071d63696b8444ec2640d
+// (include/raven/raven_shell.h, include/raven/raven_controls.h):
+// DockArea and Slot.Dock, the header bar, the island, and VBox.
+// The UII application window does not compile or call this file.
 
 use dear_imgui_rs::{
     Condition, DockLayout, DockLayoutApply, DockSplit, TableColumnFlags, TableFlags, Ui, WindowKey,
@@ -945,113 +948,98 @@ pub enum DockSide {
     Center,
 }
 
-pub trait RavenUi {
-    fn dock_area(&self, name: &str, side: DockSide, x: f32, y: f32, w: f32, h: f32, contents: impl FnOnce(&Ui));
-    fn header_bar(&self, title: &str, contents: impl FnOnce(&Ui));
-    fn island(&self, folded: impl FnOnce(&Ui), unfolded: impl FnOnce(&Ui));
-    fn vbox(&self, name: &str, kind: &str, x: f32, y: f32, w: f32, h: f32, contents: impl FnOnce(&Ui));
-    fn raven_label(&self, name: &str, text: &str, x: f32, y: f32, w: f32, h: f32);
-    fn raven_button(&self, name: &str, text: &str, x: f32, y: f32, w: f32, h: f32);
-    fn raven_image(&self, name: &str, source: &str, tex: Option<dear_imgui_rs::texture::TextureId>, x: f32, y: f32, w: f32, h: f32);
-    fn raven_table(&self, name: &str, x: f32, y: f32, w: f32, h: f32, columns: &[&str], rows: &[&[&str]]);
-    fn raven_rectangle(&self, name: &str, x: f32, y: f32, w: f32, h: f32);
-    fn raven_ellipse(&self, name: &str, x: f32, y: f32, w: f32, h: f32);
+pub fn imgui_dock_area(ui: &Ui, name: &str, side: DockSide, x: f32, y: f32, w: f32, h: f32, contents: impl FnOnce(&Ui)) {
+    let key = WindowKey::new(name, name).unwrap();
+    let fill = WindowKey::new("fill", "fill").unwrap();
+    let panel = DockLayout::tabs([&key]);
+    let rest = DockLayout::tabs([&fill]);
+    let layout = match side {
+        DockSide::Left => DockLayout::split(DockSplit::Left, 0.22, panel, rest),
+        DockSide::Right => DockLayout::split(DockSplit::Right, 0.22, panel, rest),
+        DockSide::Top => DockLayout::split(DockSplit::Up, 0.2, panel, rest),
+        DockSide::Bottom => DockLayout::split(DockSplit::Down, 0.2, panel, rest),
+        DockSide::Tab | DockSide::Center => DockLayout::tabs([&key]),
+    };
+    ui.dockspace().layout(&layout, DockLayoutApply::IfMissing).build().ok();
+    ui.window(&key)
+        .position([x, y], Condition::Always)
+        .size([w, h], Condition::Always)
+        .build(|| contents(ui));
 }
 
-impl RavenUi for Ui {
-    fn dock_area(&self, name: &str, side: DockSide, x: f32, y: f32, w: f32, h: f32, contents: impl FnOnce(&Ui)) {
-        let key = WindowKey::new(name, name).unwrap();
-        let fill = WindowKey::new("fill", "fill").unwrap();
-        let panel = DockLayout::tabs([&key]);
-        let rest = DockLayout::tabs([&fill]);
-        let layout = match side {
-            DockSide::Left => DockLayout::split(DockSplit::Left, 0.22, panel, rest),
-            DockSide::Right => DockLayout::split(DockSplit::Right, 0.22, panel, rest),
-            DockSide::Top => DockLayout::split(DockSplit::Up, 0.2, panel, rest),
-            DockSide::Bottom => DockLayout::split(DockSplit::Down, 0.2, panel, rest),
-            DockSide::Tab | DockSide::Center => DockLayout::tabs([&key]),
-        };
-        self.dockspace().layout(&layout, DockLayoutApply::IfMissing).build().ok();
-        self.window(&key)
-            .position([x, y], Condition::Always)
-            .size([w, h], Condition::Always)
-            .build(|| contents(self));
-    }
+pub fn imgui_header_bar(ui: &Ui, title: &str, contents: impl FnOnce(&Ui)) {
+    let key = WindowKey::new("header-bar", title).unwrap();
+    ui.window(&key)
+        .position([0.0, 0.0], Condition::Always)
+        .size([800.0, 32.0], Condition::Always)
+        .build(|| {
+            ui.text(title);
+            let _ = ui.button_with_size("-", [24.0, 24.0]);
+            let _ = ui.button_with_size("[]", [24.0, 24.0]);
+            let _ = ui.button_with_size("x", [24.0, 24.0]);
+            contents(ui);
+        });
+}
 
-    fn header_bar(&self, title: &str, contents: impl FnOnce(&Ui)) {
-        let key = WindowKey::new("header-bar", title).unwrap();
-        self.window(&key)
-            .position([0.0, 0.0], Condition::Always)
-            .size([800.0, 32.0], Condition::Always)
-            .build(|| {
-                self.text(title);
-                let _ = self.button_with_size("-", [24.0, 24.0]);
-                let _ = self.button_with_size("[]", [24.0, 24.0]);
-                let _ = self.button_with_size("x", [24.0, 24.0]);
-                contents(self);
-            });
+pub fn imgui_island(ui: &Ui, folded: impl FnOnce(&Ui), unfolded: impl FnOnce(&Ui)) {
+    ui.child_window("island").size([160.0, 28.0]).build(ui, || folded(ui));
+    if ui.is_item_hovered() {
+        ui.child_window("island-open").size([260.0, 80.0]).build(ui, || unfolded(ui));
     }
+}
 
-    fn island(&self, folded: impl FnOnce(&Ui), unfolded: impl FnOnce(&Ui)) {
-        self.child_window("island").size([160.0, 28.0]).build(self, || folded(self));
-        if self.is_item_hovered() {
-            self.child_window("island-open").size([260.0, 80.0]).build(self, || unfolded(self));
+pub fn imgui_vbox(ui: &Ui, name: &str, _kind: &str, x: f32, y: f32, w: f32, h: f32, contents: impl FnOnce(&Ui)) {
+    ui.set_cursor_pos([x, y]);
+    ui.child_window(name).size([w, h]).build(ui, || contents(ui));
+}
+
+pub fn imgui_label(ui: &Ui, _name: &str, text: &str, x: f32, y: f32, w: f32, h: f32) {
+    ui.set_cursor_pos([x, y]);
+    ui.dummy([w, h]);
+    ui.set_cursor_pos([x, y]);
+    ui.text(text);
+}
+
+pub fn imgui_button(ui: &Ui, _name: &str, text: &str, x: f32, y: f32, w: f32, h: f32) {
+    ui.set_cursor_pos([x, y]);
+    let _ = ui.button_with_size(text, [w, h]);
+}
+
+pub fn imgui_image(ui: &Ui, _name: &str, _source: &str, tex: Option<dear_imgui_rs::texture::TextureId>, x: f32, y: f32, w: f32, h: f32) {
+    ui.set_cursor_pos([x, y]);
+    ui.dummy([w, h]);
+    if let Some(tex) = tex {
+        ui.image(tex, [w, h]);
+    }
+}
+
+pub fn imgui_table(ui: &Ui, name: &str, x: f32, y: f32, w: f32, h: f32, columns: &[&str], rows: &[&[&str]]) {
+    ui.set_cursor_pos([x, y]);
+    if let Some(_table) = ui.begin_table_with_sizing(name, columns.len().max(1), TableFlags::BORDERS, [w, h], 0.0) {
+        for column in columns {
+            ui.table_setup_column(column, TableColumnFlags::WIDTH_STRETCH, None);
         }
-    }
-
-    fn vbox(&self, name: &str, _kind: &str, x: f32, y: f32, w: f32, h: f32, contents: impl FnOnce(&Ui)) {
-        self.set_cursor_pos([x, y]);
-        self.child_window(name).size([w, h]).build(self, || contents(self));
-    }
-
-    fn raven_label(&self, _name: &str, text: &str, x: f32, y: f32, w: f32, h: f32) {
-        self.set_cursor_pos([x, y]);
-        self.dummy([w, h]);
-        self.set_cursor_pos([x, y]);
-        self.text(text);
-    }
-
-    fn raven_button(&self, _name: &str, text: &str, x: f32, y: f32, w: f32, h: f32) {
-        self.set_cursor_pos([x, y]);
-        let _ = self.button_with_size(text, [w, h]);
-    }
-
-    fn raven_image(&self, _name: &str, _source: &str, tex: Option<dear_imgui_rs::texture::TextureId>, x: f32, y: f32, w: f32, h: f32) {
-        self.set_cursor_pos([x, y]);
-        self.dummy([w, h]);
-        if let Some(tex) = tex {
-            self.image(tex, [w, h]);
-        }
-    }
-
-    fn raven_table(&self, name: &str, x: f32, y: f32, w: f32, h: f32, columns: &[&str], rows: &[&[&str]]) {
-        self.set_cursor_pos([x, y]);
-        if let Some(_table) = self.begin_table_with_sizing(name, columns.len().max(1), TableFlags::BORDERS, [w, h], 0.0) {
-            for column in columns {
-                self.table_setup_column(column, TableColumnFlags::WIDTH_STRETCH, None);
-            }
-            self.table_headers_row();
-            for row in rows {
-                self.table_next_row();
-                for cell in *row {
-                    self.table_next_column();
-                    self.text(cell);
-                }
+        ui.table_headers_row();
+        for row in rows {
+            ui.table_next_row();
+            for cell in *row {
+                ui.table_next_column();
+                ui.text(cell);
             }
         }
     }
+}
 
-    fn raven_rectangle(&self, _name: &str, x: f32, y: f32, w: f32, h: f32) {
-        self.set_cursor_pos([x, y]);
-        self.dummy([w, h]);
-        self.get_window_draw_list().add_rect_filled_multicolor([x, y], [x + w, y + h], 0, 0, 0, 0);
-    }
+pub fn imgui_rectangle(ui: &Ui, _name: &str, x: f32, y: f32, w: f32, h: f32) {
+    ui.set_cursor_pos([x, y]);
+    ui.dummy([w, h]);
+    ui.get_window_draw_list().add_rect_filled_multicolor([x, y], [x + w, y + h], 0, 0, 0, 0);
+}
 
-    fn raven_ellipse(&self, _name: &str, x: f32, y: f32, w: f32, h: f32) {
-        self.set_cursor_pos([x, y]);
-        self.dummy([w, h]);
-        self.get_window_draw_list().add_ellipse_filled([x, y], [w, h], 0, 0.0, 24);
-    }
+pub fn imgui_ellipse(ui: &Ui, _name: &str, x: f32, y: f32, w: f32, h: f32) {
+    ui.set_cursor_pos([x, y]);
+    ui.dummy([w, h]);
+    ui.get_window_draw_list().add_ellipse_filled([x, y], [w, h], 0, 0.0, 24);
 }
 "#;
 
@@ -1061,7 +1049,7 @@ fn export_raven(doc: &Document) -> String {
         emit_raven_ui(doc, *id, &mut body, 1);
     }
     format!(
-        "{RAVEN_IMGUI}\npub fn draw(ui: &Ui, mut image: impl FnMut(&str) -> Option<dear_imgui_rs::texture::TextureId>) {{\n{body}}}\n"
+        "{RAVEN_IMGUI}\npub fn exported_layout(ui: &Ui, mut image: impl FnMut(&str) -> Option<dear_imgui_rs::texture::TextureId>) {{\n{body}}}\n"
     )
 }
 
@@ -1084,7 +1072,7 @@ fn emit_raven_ui(doc: &Document, id: NodeId, out: &mut String, depth: usize) {
                 DockSlot::Center => "Center",
             };
             out.push_str(&format!(
-                "{pad}ui.dock_area({name}, DockSide::{side}, {x}, {y}, {w}, {h}, |ui| {{\n"
+                "{pad}imgui_dock_area(ui, {name}, DockSide::{side}, {x}, {y}, {w}, {h}, |ui| {{\n"
             ));
             for child in children {
                 emit_raven_ui(doc, child, out, depth + 1);
@@ -1094,7 +1082,7 @@ fn emit_raven_ui(doc: &Document, id: NodeId, out: &mut String, depth: usize) {
         NodeKind::Frame | NodeKind::Child => {
             let kind = if node.kind == NodeKind::Frame { "frame" } else { "child" };
             out.push_str(&format!(
-                "{pad}ui.vbox({name}, \"{kind}\", {x}, {y}, {w}, {h}, |ui| {{\n"
+                "{pad}imgui_vbox(ui, {name}, \"{kind}\", {x}, {y}, {w}, {h}, |ui| {{\n"
             ));
             for child in children {
                 emit_raven_ui(doc, child, out, depth + 1);
@@ -1103,25 +1091,25 @@ fn emit_raven_ui(doc: &Document, id: NodeId, out: &mut String, depth: usize) {
         }
         NodeKind::Text => {
             out.push_str(&format!(
-                "{pad}ui.raven_label({name}, {}, {x}, {y}, {w}, {h});\n",
+                "{pad}imgui_label(ui, {name}, {}, {x}, {y}, {w}, {h});\n",
                 scan::rust_string(&node.text)
             ));
         }
         NodeKind::Button => {
             out.push_str(&format!(
-                "{pad}ui.raven_button({name}, {}, {x}, {y}, {w}, {h});\n",
+                "{pad}imgui_button(ui, {name}, {}, {x}, {y}, {w}, {h});\n",
                 scan::rust_string(&node.text)
             ));
         }
         NodeKind::Image => {
             let src = scan::rust_string(&node.image_src);
             out.push_str(&format!(
-                "{pad}ui.raven_image({name}, {src}, image({src}), {x}, {y}, {w}, {h});\n"
+                "{pad}imgui_image(ui, {name}, {src}, image({src}), {x}, {y}, {w}, {h});\n"
             ));
         }
         NodeKind::Table => {
             out.push_str(&format!(
-                "{pad}ui.raven_table({name}, {x}, {y}, {w}, {h}, &{}, &[{}]);\n",
+                "{pad}imgui_table(ui, {name}, {x}, {y}, {w}, {h}, &{}, &[{}]);\n",
                 string_list(&node.columns),
                 node.rows
                     .iter()
@@ -1131,10 +1119,10 @@ fn emit_raven_ui(doc: &Document, id: NodeId, out: &mut String, depth: usize) {
             ));
         }
         NodeKind::Rectangle => {
-            out.push_str(&format!("{pad}ui.raven_rectangle({name}, {x}, {y}, {w}, {h});\n"));
+            out.push_str(&format!("{pad}imgui_rectangle(ui, {name}, {x}, {y}, {w}, {h});\n"));
         }
         NodeKind::Ellipse => {
-            out.push_str(&format!("{pad}ui.raven_ellipse({name}, {x}, {y}, {w}, {h});\n"));
+            out.push_str(&format!("{pad}imgui_ellipse(ui, {name}, {x}, {y}, {w}, {h});\n"));
         }
     }
 }
@@ -1145,22 +1133,22 @@ fn string_list(items: &[String]) -> String {
 }
 
 const RAVEN_CALLS: &[&str] = &[
-    "ui.dock_area",
-    "ui.header_bar",
-    "ui.island",
-    "ui.vbox",
-    "ui.raven_label",
-    "ui.raven_button",
-    "ui.raven_image",
-    "ui.raven_table",
-    "ui.raven_rectangle",
-    "ui.raven_ellipse",
+    "imgui_dock_area",
+    "imgui_header_bar",
+    "imgui_island",
+    "imgui_vbox",
+    "imgui_label",
+    "imgui_button",
+    "imgui_image",
+    "imgui_table",
+    "imgui_rectangle",
+    "imgui_ellipse",
 ];
 
 fn import_raven(src: &str) -> Document {
     let mut doc = Document::new("Imported");
     let body = src
-        .find("pub fn draw")
+        .find("pub fn exported_layout")
         .map(|start| &src[start..])
         .unwrap_or(src);
     walk_raven_ui(&mut doc, None, body);
@@ -1178,11 +1166,11 @@ fn walk_raven_ui(doc: &mut Document, parent: Option<NodeId>, src: &str) {
                     strings.get(index).cloned().unwrap_or_else(|| fallback.to_string())
                 };
                 match path {
-                    "ui.dock_area" => {
+                    "imgui_dock_area" => {
                         let (x, y, w, h) = quad(&nums, 0);
                         let id = add_node(doc, parent, NodeKind::Dock, &named(0, "dock"), x, y, w, h);
                         let side = args.iter().find_map(|arg| match arg {
-                            Arg::Ident(text) => Some(text.as_str()),
+                            Arg::Ident(text) if text != "ui" => Some(text.as_str()),
                             _ => None,
                         });
                         let slot = match side.map(|text| text.rsplit("::").next().unwrap_or(text)) {
@@ -1197,14 +1185,14 @@ fn walk_raven_ui(doc: &mut Document, parent: Option<NodeId>, src: &str) {
                             walk_raven_ui(doc, Some(id), body);
                         }
                     }
-                    "ui.header_bar" => {
+                    "imgui_header_bar" => {
                         let id = add_node(doc, parent, NodeKind::Dock, &named(0, "header"), 0.0, 0.0, 800.0, 32.0);
                         doc.set_dock_slot(id, DockSlot::Top);
                         if let Some(body) = scan::body_of(&args) {
                             walk_raven_ui(doc, Some(id), body);
                         }
                     }
-                    "ui.vbox" => {
+                    "imgui_vbox" => {
                         let (x, y, w, h) = quad(&nums, 0);
                         let kind = if strings.get(1).map(|item| item == "frame").unwrap_or(false) {
                             NodeKind::Frame
@@ -1216,7 +1204,7 @@ fn walk_raven_ui(doc: &mut Document, parent: Option<NodeId>, src: &str) {
                             walk_raven_ui(doc, Some(id), body);
                         }
                     }
-                    "ui.island" => {
+                    "imgui_island" => {
                         let id = add_node(doc, parent, NodeKind::Frame, "island", 0.0, 0.0, 260.0, 80.0);
                         for arg in &args {
                             if let Arg::Body(body) = arg {
@@ -1224,18 +1212,18 @@ fn walk_raven_ui(doc: &mut Document, parent: Option<NodeId>, src: &str) {
                             }
                         }
                     }
-                    "ui.raven_label" | "ui.raven_button" => {
+                    "imgui_label" | "imgui_button" => {
                         let (x, y, w, h) = quad(&nums, 0);
                         let kind = if path.ends_with("button") { NodeKind::Button } else { NodeKind::Text };
                         let id = add_node(doc, parent, kind, &named(0, "label"), x, y, w, h);
                         doc.set_text(id, named(1, ""));
                     }
-                    "ui.raven_image" => {
+                    "imgui_image" => {
                         let (x, y, w, h) = quad(&nums, 0);
                         let id = add_node(doc, parent, NodeKind::Image, &named(0, "image"), x, y, w, h);
                         doc.set_image(id, named(1, ""));
                     }
-                    "ui.raven_table" => {
+                    "imgui_table" => {
                         let (x, y, w, h) = quad(&nums, 0);
                         let id = add_node(doc, parent, NodeKind::Table, &named(0, "table"), x, y, w, h);
                         let columns = args.iter().find_map(|arg| match arg {
@@ -1252,7 +1240,7 @@ fn walk_raven_ui(doc: &mut Document, parent: Option<NodeId>, src: &str) {
                         }).unwrap_or_default();
                         doc.set_table(id, columns, rows);
                     }
-                    "ui.raven_rectangle" | "ui.raven_ellipse" => {
+                    "imgui_rectangle" | "imgui_ellipse" => {
                         let (x, y, w, h) = quad(&nums, 0);
                         let kind = if path.ends_with("ellipse") { NodeKind::Ellipse } else { NodeKind::Rectangle };
                         add_node(doc, parent, kind, &named(0, "shape"), x, y, w, h);

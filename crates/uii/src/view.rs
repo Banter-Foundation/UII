@@ -5,9 +5,9 @@
 
 use dear_imgui_rs::{Condition, DrawListMut, DrawSegmentCount, Key, MouseButton, Ui, WindowFlags};
 use uii_core::{
-    command_for, export_source, import_source, parse_hex_color, resize_from_handle, shortcuts,
-    Bind, BindKey, DrawerPage, Easing, Editor, Handle, Motion, NodeId, NodeKind, Rect,
-    WorkspaceTab, MARKUP_STARTS_CLOSED,
+    command_for, export_source, import_source, library_file_path, parse_hex_color, read_library,
+    resize_from_handle, shortcuts, write_library, AssetKind, Bind, BindKey, Command, DrawerPage,
+    Editor, Handle, Motion, NodeId, NodeKind, Rect, WorkspaceTab, MARKUP_STARTS_CLOSED,
 };
 use uii_function::Session;
 
@@ -28,6 +28,10 @@ pub struct View {
     export_text: String,
     asset_path: String,
     component_name: String,
+    library_name: String,
+    library_query: String,
+    motion: uii_animation::AnimationTab,
+    motion_path: std::path::PathBuf,
     status: String,
     canvas_size: [f32; 2],
     props_id: Option<u32>,
@@ -72,6 +76,18 @@ enum Gesture {
 
 impl View {
     pub fn new() -> Self {
+        let motion_path = uii_animation::animation_path();
+        let mut motion = uii_animation::AnimationTab::new();
+        let mut status = String::new();
+        match uii_animation::load_animation(&motion_path) {
+            Ok(file) => {
+                motion.project = file.project;
+                if !file.status.is_empty() {
+                    status = file.status;
+                }
+            }
+            Err(err) => status = err,
+        }
         Self {
             gesture: Gesture::None,
             guides: Vec::new(),
@@ -89,7 +105,11 @@ impl View {
             export_text: String::new(),
             asset_path: String::new(),
             component_name: String::from("Card"),
-            status: String::new(),
+            library_name: String::new(),
+            library_query: String::new(),
+            motion,
+            motion_path,
+            status,
             canvas_size: [800.0, 600.0],
             props_id: None,
             props_editing: false,
@@ -108,6 +128,39 @@ impl View {
     pub fn save_function(&mut self) {
         if let Err(err) = self.functions.save_if_changed() {
             self.status = err;
+        }
+    }
+
+    pub fn load_library(&mut self, editor: &mut Editor) {
+        match read_library(&library_file_path()) {
+            Ok(Some(library)) => editor.replace_library(library),
+            Ok(None) => {}
+            Err(err) => self.status = err,
+        }
+    }
+
+    pub fn save_library(&mut self, editor: &mut Editor) {
+        if !editor.library_changed() {
+            return;
+        }
+        match write_library(&library_file_path(), editor.library()) {
+            Ok(()) => editor.clear_library_changed(),
+            Err(err) => {
+                editor.mark_library_changed();
+                self.status = err;
+            }
+        }
+    }
+
+    pub fn save_motion(&mut self) {
+        if !self.motion.is_dirty() {
+            return;
+        }
+        match uii_animation::save_animation(&self.motion_path, &self.motion.project) {
+            Ok(()) => {
+                let _ = self.motion.take_dirty();
+            }
+            Err(err) => self.status = err,
         }
     }
 
@@ -169,6 +222,11 @@ impl View {
                     shift,
                     key: bind,
                 }) {
+                    if editor.tab() == WorkspaceTab::Animation
+                        && matches!(command, Command::Undo | Command::Redo | Command::Delete)
+                    {
+                        continue;
+                    }
                     editor.apply_command(command, self.canvas_size);
                 }
             }
@@ -213,9 +271,9 @@ impl View {
         let drawer_body = if editor.drawer_collapsed() {
             0.0
         } else {
-            168.0
+            260.0
         };
-        let timeline = if animate { 120.0 } else { 0.0 };
+        let timeline = if animate { 300.0 } else { 0.0 };
         let body_h = (avail[1] - drawer_body - timeline - 32.0).max(120.0);
         ui.child_window("workspace-body")
             .size([avail[0], body_h])
@@ -254,7 +312,7 @@ impl View {
             });
 
         if animate {
-            self.timeline(ui, editor);
+            self.animation_host(ui, editor, dt);
         }
         self.drawer(ui, editor);
         if ui.is_mouse_clicked(MouseButton::Left) && !self.drawer_hovered {
@@ -828,54 +886,6 @@ impl View {
         }
     }
 
-    fn timeline(&mut self, ui: &Ui, editor: &mut Editor) {
-        ui.separator();
-        let playing = editor.playing();
-        if ui.button(if playing { "Pause" } else { "Play" }) {
-            editor.set_playing(!playing);
-        }
-        ui.same_line();
-        if ui.button("Key") {
-            if let Some(id) = editor.selected() {
-                let rect = editor.document().node(id).rect;
-                let time = editor.time();
-                editor.add_key(id, Motion::X, time, rect.x);
-                editor.add_key(id, Motion::Y, time, rect.y);
-                editor.add_key(id, Motion::Width, time, rect.width);
-                editor.add_key(id, Motion::Height, time, rect.height);
-            }
-        }
-        ui.same_line();
-        ui.text(editor.ease().label());
-        for ease in [
-            Easing::Linear,
-            Easing::EaseIn,
-            Easing::EaseOut,
-            Easing::EaseInOut,
-            Easing::Hold,
-        ] {
-            ui.same_line();
-            if ui.button(format!("{}##ease", ease.label())) {
-                editor.set_ease(ease);
-                if let Some(id) = editor.selected() {
-                    let time = editor.time();
-                    for prop in [Motion::X, Motion::Y, Motion::Width, Motion::Height] {
-                        editor.set_key_easing(id, prop, time, ease);
-                    }
-                }
-            }
-        }
-        let mut time = editor.time();
-        let end = editor.duration().max(time);
-        if ui.slider_f32("Time", &mut time, 0.0, end) {
-            editor.set_time(time);
-        }
-        if let Some(id) = editor.selected() {
-            let keys = editor.keys_for(id);
-            ui.text(format!("{} keys on the selection", keys.len()));
-        }
-    }
-
     fn drawer(&mut self, ui: &Ui, editor: &mut Editor) {
         ui.separator();
         let cursor = ui.cursor_screen_pos();
@@ -926,6 +936,50 @@ impl View {
     }
 
     fn assets(&mut self, ui: &Ui, editor: &mut Editor) {
+        if ui.input_text("Find", &mut self.library_query).build() {
+            editor.set_library_query(&self.library_query);
+        }
+        ui.input_text("Folder or asset", &mut self.library_name)
+            .build();
+        if ui.button("New folder") {
+            if let Err(err) = editor.create_named_folder(&self.library_name) {
+                self.status = err.to_string();
+            }
+        }
+        ui.same_line();
+        if ui.button("New asset") {
+            if let Err(err) = editor.create_named_asset(&self.library_name) {
+                self.status = err.to_string();
+            }
+        }
+        ui.same_line();
+        if ui.button("Remove") {
+            if let Err(err) = editor.delete_library_selection() {
+                self.status = err.to_string();
+            }
+        }
+        let rows = editor.library_rows();
+        if rows.is_empty() {
+            ui.text("No folders yet. Create a folder, then an asset inside it.");
+        }
+        for row in rows {
+            let indent = "  ".repeat(row.depth as usize);
+            let mark = if row.kind == AssetKind::Folder {
+                "folder"
+            } else {
+                "asset"
+            };
+            if ui.button(format!("{indent}{mark} {}##lib{}", row.name, row.id.0)) {
+                editor.activate_library_row(row.id);
+            }
+            if row.kind == AssetKind::Asset {
+                ui.same_line();
+                if ui.button(format!("Place##lib{}", row.id.0)) {
+                    editor.place_asset(&row.name);
+                }
+            }
+        }
+        ui.separator();
         ui.input_text("Asset path", &mut self.asset_path).build();
         ui.same_line();
         if ui.button("Add asset") {
@@ -939,9 +993,36 @@ impl View {
             ui.same_line();
             ui.text(path);
         }
-        if paths.is_empty() {
-            ui.text("No assets yet. Add a path, then place it on the canvas.");
+    }
+
+    fn animation_host(&mut self, ui: &Ui, editor: &mut Editor, dt: f32) {
+        self.sync_motion_targets(editor);
+        self.motion.tick(dt);
+        uii_animation::draw_animation_tab(ui, &mut self.motion);
+    }
+
+    fn sync_motion_targets(&mut self, editor: &Editor) {
+        let mut nodes = Vec::new();
+        for node in editor.document().nodes() {
+            let rect = editor.document().absolute_rect(node.id);
+            nodes.push(uii_animation::LayoutNode {
+                id: uii_animation::NodeId(node.id.0),
+                name: node.name.clone(),
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+                rotation_deg: 0.0,
+                opacity: node.fill.a as f32 / 255.0,
+                fill: [
+                    node.fill.r as f32 / 255.0,
+                    node.fill.g as f32 / 255.0,
+                    node.fill.b as f32 / 255.0,
+                    node.fill.a as f32 / 255.0,
+                ],
+            });
         }
+        self.motion.project.sync_targets(&nodes);
     }
 
     fn components(&mut self, ui: &Ui, editor: &mut Editor) {
@@ -950,16 +1031,23 @@ impl View {
         if ui.button("Save selection") {
             editor.save_component(&self.component_name);
         }
-        let names: Vec<String> = editor
-            .components()
-            .iter()
-            .map(|component| component.name.clone())
-            .collect();
+        let mut names = editor.library_component_names();
+        for component in editor.components() {
+            if !names.iter().any(|name| name == &component.name) {
+                names.push(component.name.clone());
+            }
+        }
         for (index, name) in names.iter().enumerate() {
-            if ui.button(format!("Insert##component{index}")) {
+            let saved = editor
+                .components()
+                .iter()
+                .any(|component| component.name == *name);
+            if saved && ui.button(format!("Insert##component{index}")) {
                 editor.insert_component(name);
             }
-            ui.same_line();
+            if saved {
+                ui.same_line();
+            }
             ui.text(name);
         }
         if names.is_empty() {

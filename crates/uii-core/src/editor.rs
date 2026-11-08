@@ -2,11 +2,15 @@
 //! Design and Animation are the only top-level tabs. Assets and Components
 //! live in a collapsible drawer. Inspect is a tool, not a tab.
 
+use std::collections::BTreeSet;
+
 use crate::commands::Command;
 use crate::document::{snap_rect, Document, NodeId, NodeKind, Rect, Rgba};
 use crate::easing::Easing;
 use crate::exchange::html_and_css;
+use crate::folders::{folder_rows, FolderRow};
 use crate::html::import_html_css;
+use crate::library::{AssetId, AssetKind, Library, LibraryError};
 use crate::{format_color, SNAP_PX};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -159,6 +163,11 @@ pub struct Editor {
     revision: u64,
     assets: Vec<String>,
     components: Vec<Component>,
+    library: Library,
+    library_query: String,
+    library_selected: Option<AssetId>,
+    library_expanded: BTreeSet<AssetId>,
+    library_dirty: bool,
     keys: Vec<Keyframe>,
     time: f32,
     playing: bool,
@@ -187,6 +196,11 @@ impl Editor {
             revision: 0,
             assets: Vec::new(),
             components: Vec::new(),
+            library: Library::new(),
+            library_query: String::new(),
+            library_selected: None,
+            library_expanded: BTreeSet::new(),
+            library_dirty: false,
             keys: Vec::new(),
             time: 0.0,
             playing: false,
@@ -421,6 +435,7 @@ impl Editor {
         if !self.assets.iter().any(|item| item == path) {
             self.assets.push(path.to_string());
         }
+        self.note_library_asset(path);
     }
 
     pub fn place_asset(&mut self, path: &str) -> NodeId {
@@ -467,6 +482,7 @@ impl Editor {
                 css,
             });
         }
+        self.note_library_component(name);
     }
 
     pub fn insert_component(&mut self, name: &str) {
@@ -681,6 +697,104 @@ impl Editor {
     pub fn dismiss_unpinned_drawer(&mut self) {
         if self.drawer_open && !self.drawer_pinned {
             self.drawer_open = false;
+        }
+    }
+
+    pub fn library(&self) -> &Library {
+        &self.library
+    }
+
+    pub fn library_changed(&self) -> bool {
+        self.library_dirty
+    }
+
+    pub fn clear_library_changed(&mut self) {
+        self.library_dirty = false;
+    }
+
+    pub fn mark_library_changed(&mut self) {
+        self.library_dirty = true;
+    }
+
+    pub fn replace_library(&mut self, library: Library) {
+        self.library = library;
+        self.library_selected = None;
+        self.library_expanded.clear();
+        self.library_dirty = false;
+    }
+
+    pub fn set_library_query(&mut self, query: &str) {
+        self.library_query = query.to_string();
+    }
+
+    pub fn library_rows(&self) -> Vec<FolderRow> {
+        folder_rows(&self.library, &self.library_query, &self.library_expanded)
+    }
+
+    pub fn library_component_names(&self) -> Vec<String> {
+        let mut ids: Vec<_> = self
+            .library
+            .components()
+            .iter()
+            .map(|component| component.id)
+            .collect();
+        ids.sort_by(|left, right| self.library.cmp_components(*left, *right));
+        ids.into_iter()
+            .filter_map(|id| {
+                self.library
+                    .component(id)
+                    .map(|component| component.name.clone())
+            })
+            .collect()
+    }
+
+    pub fn activate_library_row(&mut self, id: AssetId) {
+        self.library_selected = Some(id);
+        if self.library.is_folder(id) && !self.library_expanded.insert(id) {
+            self.library_expanded.remove(&id);
+        }
+    }
+
+    pub fn create_named_folder(&mut self, name: &str) -> Result<AssetId, LibraryError> {
+        let parent = self.library_parent();
+        let id = self.library.create_folder(parent, name)?;
+        if let Some(parent) = parent {
+            self.library_expanded.insert(parent);
+        }
+        self.library_expanded.insert(id);
+        self.library_selected = Some(id);
+        self.library_dirty = true;
+        Ok(id)
+    }
+
+    pub fn create_named_asset(&mut self, name: &str) -> Result<AssetId, LibraryError> {
+        let parent = self.library_parent();
+        let id = self.library.create_asset(parent, name)?;
+        if let Some(parent) = parent {
+            self.library_expanded.insert(parent);
+        }
+        self.library_selected = Some(id);
+        self.library_dirty = true;
+        Ok(id)
+    }
+
+    pub fn delete_library_selection(&mut self) -> Result<(), LibraryError> {
+        let id = self.library_selected.ok_or(LibraryError::Missing)?;
+        self.library.delete_asset(id)?;
+        self.library_selected = None;
+        self.library_expanded
+            .retain(|folder| self.library.is_folder(*folder));
+        self.library_dirty = true;
+        Ok(())
+    }
+
+    pub fn selected_library_asset(&self) -> Option<&str> {
+        let id = self.library_selected?;
+        let asset = self.library.asset(id)?;
+        if asset.kind == AssetKind::Asset {
+            Some(asset.name.as_str())
+        } else {
+            None
         }
     }
 
@@ -1000,6 +1114,46 @@ impl Editor {
         self.html = html;
         self.css = css;
         self.revision = self.revision.wrapping_add(1);
+    }
+
+    fn library_parent(&self) -> Option<AssetId> {
+        let id = self.library_selected?;
+        let asset = self.library.asset(id)?;
+        if asset.kind == AssetKind::Folder {
+            Some(id)
+        } else {
+            asset.parent
+        }
+    }
+
+    fn note_library_asset(&mut self, path: &str) {
+        let name = path.rsplit(['/', '\\']).next().unwrap_or(path);
+        if name.trim().is_empty() {
+            return;
+        }
+        if self.library.assets().iter().any(|asset| asset.name == name) {
+            return;
+        }
+        if self.library.create_asset(None, name).is_ok() {
+            self.library_dirty = true;
+        }
+    }
+
+    fn note_library_component(&mut self, name: &str) {
+        if name.trim().is_empty() {
+            return;
+        }
+        if self
+            .library
+            .components()
+            .iter()
+            .any(|component| component.name == name)
+        {
+            return;
+        }
+        if self.library.create_component(name).is_ok() {
+            self.library_dirty = true;
+        }
     }
 }
 

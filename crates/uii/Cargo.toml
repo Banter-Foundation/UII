@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 uii-core = { path = "../uii-core" }
+uii-animation = { path = "../uii-animation" }
 uii-cursor = { path = "../../cursor-plugin" }
 uii-function = { path = "../uii-function", features = ["desktop"] }
 dear-imgui-rs = "0.22"

@@ -31,14 +31,14 @@ The window opens on an empty document. Nothing is seeded.
 The top of the window has three tabs:
 
 - **Design** is the layout canvas. Layers stay on the left and properties stay on the right: position, size, fill, and type. Text uses its font size. Rectangles and frames have a fill and a corner radius. Frames clip their children and can nest.
-- **Animation** is the same canvas with a playhead. Motion is position and size, with linear, ease, and hold curves. Playing it does not write the sampled pose back over the design.
+- **Animation** is the same canvas plus the animation host: clips, property tracks, a timeline, and a motion preview. The clip file is `animation.json` (`UII_ANIMATION_PATH` overrides it). Playing a clip does not write the sampled pose back over the design.
 - **Function** is the behavior graph. Save writes `function.graph` under the UII data directory.
 
 The tools on Design and Animation are Select, Frame, Text, Rectangle, Ellipse, and Inspect. Inspect is a tool. When an object is selected it shows that object's type, size, and color. It is not a tab. The properties column shows the same selection while you are designing, including position and fill.
 
 Shift-click adds to the selection. Dragging on empty canvas selects everything the rectangle covers. Moving snaps edges and centers to other objects. Undo is Ctrl+Z. The full shortcut list is in the properties column: undo, redo, copy, paste, duplicate, delete, select all, group, zoom in, zoom out, and fit.
 
-**Assets** and **Components** are in the Content drawer at the bottom. It starts collapsed. Ctrl+Space toggles it. Pin keeps it open; otherwise a click outside closes it. Add an asset by path and place it, or save the selection as a component and insert it later.
+**Assets** and **Components** are in the Content drawer at the bottom. It starts collapsed. Ctrl+Space toggles it. Pin keeps it open; otherwise a click outside closes it. The drawer is a folder library: create folders, put assets inside them, and save a selection as a component. That tree is `library.json` under `UII_DATA`, or the platform UII data directory. A path can still be added and placed on the canvas.
 
 **HTML / CSS** opens the markup for the current canvas. Apply writes it back onto the canvas. It starts closed. Leave it closed while you draw.
 

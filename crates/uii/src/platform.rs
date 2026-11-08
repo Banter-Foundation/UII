@@ -45,6 +45,7 @@ pub fn run() -> Result<(), String> {
     let jobs = bridge::start();
     let mut editor = Editor::new();
     let mut view = View::new();
+    view.load_library(&mut editor);
     let plug = uii_cursor::LayoutPlug::bind().ok();
     let snapshot_path = uii_cursor::default_snapshot_path();
     let mut published = u64::MAX;
@@ -86,6 +87,8 @@ pub fn run() -> Result<(), String> {
         }
         let ui = imgui.frame();
         view.draw(&ui, &mut editor, dt);
+        view.save_library(&mut editor);
+        view.save_motion();
         if editor.revision() != published {
             if let Some(plug) = &plug {
                 if let Ok(snapshot) = crate::publish::snapshot(&editor) {
@@ -103,6 +106,8 @@ pub fn run() -> Result<(), String> {
             .map_err(|err| format!("imgui render: {err}"))?;
         window.swap_buffers();
     }
+    view.save_library(&mut editor);
+    view.save_motion();
     view.save_function();
     Ok(())
 }

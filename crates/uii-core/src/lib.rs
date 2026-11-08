@@ -5,7 +5,9 @@ mod commands;
 mod document;
 mod easing;
 mod exchange;
+mod folders;
 mod html;
+mod library;
 mod scan;
 
 mod editor;
@@ -23,4 +25,9 @@ pub use editor::{
     WorkspaceTab,
 };
 pub use exchange::{export_source, formats, html_and_css, import_source, FormatError, FormatInfo};
+pub use folders::{
+    default_data_dir, folder_rows, library_file_path, read_library, resolve_data_dir,
+    write_library, DataDirOs, FolderRow,
+};
 pub use html::import_html_css;
+pub use library::{AssetId, AssetKind, Library, LibraryError, StoreError};

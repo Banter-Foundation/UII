@@ -1,3 +1,3 @@
 [workspace]
 resolver = "2"
-members = ["crates/uii-core", "crates/uii"]
+members = ["crates/uii-core", "crates/uii", "crates/uii-function", "cursor-plugin"]

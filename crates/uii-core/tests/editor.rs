@@ -1,9 +1,9 @@
 use uii_core::{DrawerPage, Editor, Motion, NodeKind, Rect, Rgba, Tool, WorkspaceTab};
 
 #[test]
-fn top_tabs_are_only_design_and_animation() {
+fn top_tabs_are_design_animation_and_function() {
     let labels: Vec<_> = Editor::tabs().iter().map(|tab| tab.label()).collect();
-    assert_eq!(labels, vec!["Design", "Animation"]);
+    assert_eq!(labels, vec!["Design", "Animation", "Function"]);
 }
 
 #[test]

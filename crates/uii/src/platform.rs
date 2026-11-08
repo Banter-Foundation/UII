@@ -14,7 +14,9 @@ use uii_core::Editor;
 pub fn run() -> Result<(), String> {
     let mut glfw = glfw::init(glfw::fail_on_errors).map_err(|err| err.to_string())?;
     glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
-    glfw.window_hint(glfw::WindowHint::OpenGlProfile(glfw::OpenGlProfileHint::Core));
+    glfw.window_hint(glfw::WindowHint::OpenGlProfile(
+        glfw::OpenGlProfileHint::Core,
+    ));
     glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));
     glfw.window_hint(glfw::WindowHint::ScaleToMonitor(true));
 
@@ -43,6 +45,9 @@ pub fn run() -> Result<(), String> {
     let jobs = bridge::start();
     let mut editor = Editor::new();
     let mut view = View::new();
+    let plug = uii_cursor::LayoutPlug::bind().ok();
+    let snapshot_path = uii_cursor::default_snapshot_path();
+    let mut published = u64::MAX;
     let started = Instant::now();
     let mut last = started;
 
@@ -58,8 +63,16 @@ pub fn run() -> Result<(), String> {
         last = now;
         let (width, height) = window.get_size();
         let (fb_w, fb_h) = window.get_framebuffer_size();
-        let scale_x = if width > 0 { fb_w as f32 / width as f32 } else { 1.0 };
-        let scale_y = if height > 0 { fb_h as f32 / height as f32 } else { 1.0 };
+        let scale_x = if width > 0 {
+            fb_w as f32 / width as f32
+        } else {
+            1.0
+        };
+        let scale_y = if height > 0 {
+            fb_h as f32 / height as f32
+        } else {
+            1.0
+        };
         {
             let io = imgui.io_mut();
             io.set_display_size([width as f32, height as f32]);
@@ -73,6 +86,14 @@ pub fn run() -> Result<(), String> {
         }
         let ui = imgui.frame();
         view.draw(&ui, &mut editor, dt);
+        if editor.revision() != published {
+            if let Some(plug) = &plug {
+                if let Ok(snapshot) = crate::publish::snapshot(&editor) {
+                    let _ = plug.publish_to(snapshot, &snapshot_path);
+                }
+            }
+            published = editor.revision();
+        }
         let consumer = renderer
             .renderer_consumer()
             .map_err(|err| format!("imgui consumer: {err}"))?;
@@ -82,6 +103,7 @@ pub fn run() -> Result<(), String> {
             .map_err(|err| format!("imgui render: {err}"))?;
         window.swap_buffers();
     }
+    view.save_function();
     Ok(())
 }
 

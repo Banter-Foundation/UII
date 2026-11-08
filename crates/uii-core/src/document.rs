@@ -26,6 +26,130 @@ impl Rect {
     pub fn contains(self, px: f32, py: f32) -> bool {
         px >= self.x && py >= self.y && px < self.x + self.width && py < self.y + self.height
     }
+
+    pub fn intersects(self, other: Self) -> bool {
+        self.x < other.x + other.width
+            && self.x + self.width > other.x
+            && self.y < other.y + other.height
+            && self.y + self.height > other.y
+    }
+}
+
+/// A vertical line is `vertical` at x = `at`. A horizontal line is the other way.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Guide {
+    pub vertical: bool,
+    pub at: f32,
+}
+
+pub const SNAP_PX: f32 = 6.0;
+
+/// Snap `proposed` (absolute) to other nodes' edges and centers.
+pub fn snap_rect(
+    doc: &Document,
+    ignore: &[NodeId],
+    proposed: Rect,
+    threshold: f32,
+) -> (Rect, Vec<Guide>) {
+    let mut targets = Vec::new();
+    for node in doc.nodes() {
+        if ignored(doc, node.id, ignore) {
+            continue;
+        }
+        targets.push(doc.absolute_rect(node.id));
+    }
+    targets.push(Rect::new(0.0, 0.0, 0.0, 0.0));
+    let mut guides = Vec::new();
+    let (x, guide_x) = snap_axis(proposed.x, proposed.width, &targets, true, threshold);
+    let (y, guide_y) = snap_axis(proposed.y, proposed.height, &targets, false, threshold);
+    if let Some(at) = guide_x {
+        guides.push(Guide { vertical: true, at });
+    }
+    if let Some(at) = guide_y {
+        guides.push(Guide {
+            vertical: false,
+            at,
+        });
+    }
+    (Rect::new(x, y, proposed.width, proposed.height), guides)
+}
+
+fn ignored(doc: &Document, id: NodeId, ignore: &[NodeId]) -> bool {
+    if ignore.contains(&id) {
+        return true;
+    }
+    let mut parent = doc.get(id).and_then(|node| node.parent);
+    while let Some(current) = parent {
+        if ignore.contains(&current) {
+            return true;
+        }
+        parent = doc.get(current).and_then(|node| node.parent);
+    }
+    false
+}
+
+fn snap_axis(
+    start: f32,
+    size: f32,
+    targets: &[Rect],
+    horizontal: bool,
+    threshold: f32,
+) -> (f32, Option<f32>) {
+    let moving = [start, start + size * 0.5, start + size];
+    let mut best: Option<(f32, f32, f32)> = None;
+    for target in targets {
+        let (origin, length) = if horizontal {
+            (target.x, target.width)
+        } else {
+            (target.y, target.height)
+        };
+        let points = [origin, origin + length * 0.5, origin + length];
+        for from in moving {
+            for to in points {
+                let err = to - from;
+                if err.abs() > threshold {
+                    continue;
+                }
+                if best.map(|(prev, _, _)| err.abs() < prev).unwrap_or(true) {
+                    best = Some((err.abs(), start + err, to));
+                }
+            }
+        }
+    }
+    match best {
+        Some((_, next, guide)) => (next, Some(guide)),
+        None => (start, None),
+    }
+}
+
+pub fn format_color(color: Rgba) -> String {
+    if color.a == 255 {
+        format!("#{:02x}{:02x}{:02x}", color.r, color.g, color.b)
+    } else {
+        format!(
+            "#{:02x}{:02x}{:02x}{:02x}",
+            color.r, color.g, color.b, color.a
+        )
+    }
+}
+
+pub fn parse_hex_color(text: &str) -> Option<Rgba> {
+    let hex = text.trim().trim_start_matches('#');
+    let byte = |s: &str| u8::from_str_radix(s, 16).ok();
+    match hex.len() {
+        6 => Some(Rgba::rgb(
+            byte(&hex[0..2])?,
+            byte(&hex[2..4])?,
+            byte(&hex[4..6])?,
+        )),
+        8 => Some(Rgba::rgba(
+            byte(&hex[0..2])?,
+            byte(&hex[2..4])?,
+            byte(&hex[4..6])?,
+            byte(&hex[6..8])?,
+        )),
+        _ => None,
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -115,6 +239,7 @@ pub struct Node {
     pub color: Rgba,
     pub text: String,
     pub font_size: f32,
+    pub corner_radius: f32,
     pub image_src: String,
     pub dock_slot: Option<DockSlot>,
     pub columns: Vec<String>,
@@ -122,6 +247,7 @@ pub struct Node {
     alive: bool,
 }
 
+#[derive(Clone, Debug)]
 pub struct Document {
     pub name: String,
     nodes: Vec<Node>,
@@ -157,6 +283,7 @@ impl Document {
             color,
             text: String::new(),
             font_size: 16.0,
+            corner_radius: 0.0,
             image_src: String::new(),
             dock_slot: None,
             columns: Vec::new(),
@@ -272,10 +399,13 @@ impl Document {
         fn hit(doc: &Document, ids: &[NodeId], x: f32, y: f32) -> Option<NodeId> {
             for id in ids.iter().rev() {
                 let node = doc.node(*id);
+                let abs = doc.absolute_rect(*id);
+                if node.kind == NodeKind::Frame && !abs.contains(x, y) {
+                    continue;
+                }
                 if let Some(found) = hit(doc, &node.children, x, y) {
                     return Some(found);
                 }
-                let abs = doc.absolute_rect(*id);
                 if contains_kind(node.kind, abs, x, y) {
                     return Some(*id);
                 }
@@ -283,6 +413,60 @@ impl Document {
             None
         }
         hit(self, &self.roots, x, y)
+    }
+
+    pub fn intersects_nodes(&self, area: Rect) -> Vec<NodeId> {
+        self.nodes()
+            .filter(|node| self.absolute_rect(node.id).intersects(area))
+            .map(|node| node.id)
+            .collect()
+    }
+
+    pub fn is_descendant(&self, id: NodeId, ancestor: NodeId) -> bool {
+        let mut parent = self.get(id).and_then(|node| node.parent);
+        while let Some(current) = parent {
+            if current == ancestor {
+                return true;
+            }
+            parent = self.get(current).and_then(|node| node.parent);
+        }
+        false
+    }
+
+    /// Keep the node's absolute position and move it under `new_parent`.
+    pub fn reparent(&mut self, id: NodeId, new_parent: Option<NodeId>) -> bool {
+        if self.get(id).is_none() {
+            return false;
+        }
+        if let Some(parent) = new_parent {
+            if parent == id || self.is_descendant(parent, id) || self.get(parent).is_none() {
+                return false;
+            }
+        }
+        if self.node(id).parent == new_parent {
+            return true;
+        }
+        let abs = self.absolute_rect(id);
+        if let Some(parent) = self.nodes[id.0 as usize].parent {
+            self.nodes[parent.0 as usize]
+                .children
+                .retain(|child| *child != id);
+        } else {
+            self.roots.retain(|root| *root != id);
+        }
+        self.nodes[id.0 as usize].parent = new_parent;
+        let (origin_x, origin_y) = if let Some(parent) = new_parent {
+            let parent_abs = self.absolute_rect(parent);
+            self.nodes[parent.0 as usize].children.push(id);
+            (parent_abs.x, parent_abs.y)
+        } else {
+            self.roots.push(id);
+            (0.0, 0.0)
+        };
+        let rect = &mut self.nodes[id.0 as usize].rect;
+        rect.x = abs.x - origin_x;
+        rect.y = abs.y - origin_y;
+        true
     }
 }
 
@@ -321,8 +505,14 @@ pub fn resize_from_handle(rect: Rect, handle: Handle, dx: f32, dy: f32) -> Rect 
     let mut height = rect.height;
     let east = matches!(handle, Handle::East | Handle::NorthEast | Handle::SouthEast);
     let west = matches!(handle, Handle::West | Handle::NorthWest | Handle::SouthWest);
-    let south = matches!(handle, Handle::South | Handle::SouthEast | Handle::SouthWest);
-    let north = matches!(handle, Handle::North | Handle::NorthEast | Handle::NorthWest);
+    let south = matches!(
+        handle,
+        Handle::South | Handle::SouthEast | Handle::SouthWest
+    );
+    let north = matches!(
+        handle,
+        Handle::North | Handle::NorthEast | Handle::NorthWest
+    );
     if east {
         width += dx;
     }

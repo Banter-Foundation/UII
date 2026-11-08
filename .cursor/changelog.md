@@ -13,3 +13,7 @@ The custom export is Banter's Dear ImGui 0.22 with Raven's shell added onto `Ui`
 ## 2026-11-07 14:07:09 -0600 [Cursor Agent] — Raven stays in export and import
 
 Raven's DockArea, header bar, island, and VBox are functions in the exported Dear ImGui file. Import reads those functions back onto the canvas. The editor window does not compile or call them.
+
+## 2026-11-08 02:41:01 +0000 [Cursor Agent] — Layout canvas, shortcuts, and folded tabs
+
+Design keeps layers and properties on screen. Moving snaps and aligns, selection can be more than one object, and undo and redo cover those edits. Frames clip nested children. Text draws at its font size, and shapes keep fill and corner radius. Shortcuts for undo, redo, copy, paste, duplicate, delete, select all, group, zoom, and fit are listed in the properties column. HTML and CSS stay behind a closed panel. The Function tab and the Cursor layout plugin are in this tree. The content drawer toggles with Ctrl+Space and can be pinned.

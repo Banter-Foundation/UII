@@ -28,16 +28,19 @@ cargo run -p uii
 
 The window opens on an empty document. Nothing is seeded.
 
-The top of the window has two tabs:
+The top of the window has three tabs:
 
-- **Design** is the layout canvas.
-- **Animation** is the same canvas with a playhead. Motion is position and size. Playing it does not write the sampled pose back over the design.
+- **Design** is the layout canvas. Layers stay on the left and properties stay on the right: position, size, fill, and type. Text uses its font size. Rectangles and frames have a fill and a corner radius. Frames clip their children and can nest.
+- **Animation** is the same canvas with a playhead. Motion is position and size, with linear, ease, and hold curves. Playing it does not write the sampled pose back over the design.
+- **Function** is the behavior graph. Save writes `function.graph` under the UII data directory.
 
-The tools on those tabs are Select, Frame, Text, Rectangle, Ellipse, and Inspect. Inspect is a tool. When an object is selected it shows that object's type, size, and color. It is not a tab.
+The tools on Design and Animation are Select, Frame, Text, Rectangle, Ellipse, and Inspect. Inspect is a tool. When an object is selected it shows that object's type, size, and color. It is not a tab. The properties column shows the same selection while you are designing, including position and fill.
 
-**Assets** and **Components** are in the Content drawer at the bottom. It starts collapsed. Open it, then pick Assets or Components. Add an asset by path and place it, or save the selection as a component and insert it later.
+Shift-click adds to the selection. Dragging on empty canvas selects everything the rectangle covers. Moving snaps edges and centers to other objects. Undo is Ctrl+Z. The full shortcut list is in the properties column: undo, redo, copy, paste, duplicate, delete, select all, group, zoom in, zoom out, and fit.
 
-**HTML / CSS** opens the markup for the current canvas. Apply writes it back onto the canvas. Leave it closed while you draw.
+**Assets** and **Components** are in the Content drawer at the bottom. It starts collapsed. Ctrl+Space toggles it. Pin keeps it open; otherwise a click outside closes it. Add an asset by path and place it, or save the selection as a component and insert it later.
+
+**HTML / CSS** opens the markup for the current canvas. Apply writes it back onto the canvas. It starts closed. Leave it closed while you draw.
 
 Drag with the right mouse button to pan the canvas. Delete removes the selection.
 
@@ -98,12 +101,14 @@ EOF
 
 `uii mcp` speaks MCP on stdin and stdout (Content-Length frames) and forwards to that socket. The tools are `get_design` and `apply_layout`. `.cursor/mcp.json` starts it with `cargo run -p uii --quiet -- -- mcp`. Start the window first. `get` and `apply` do nothing useful until it is open.
 
+The Cursor plugin in `cursor-plugin/` is separate. The window publishes the open layout on loopback and writes `layout.json` for `uii-cursor`. The tools there are `read_layout`, `read_intent`, and `read_region`. HTML and CSS in that snapshot are the description of the layout. The plugin does not serve a page.
+
 ## What is missing
 
 - CSS is a layout subset: size, position, color, font size, border radius, and simple selectors. No flex, grid, media queries, or generated content.
-- Text measurement is a fixed width factor, not a real font.
+- HTML import still estimates text width with a fixed factor. The canvas draws text at the node's font size.
 - Images are paths. The canvas does not decode the file.
-- There is no undo, no save file, and no collaboration.
-- Animation keys are only x, y, width, and height.
+- The design itself has no save file. The function graph does. There is no collaboration.
+- Animation keys are x, y, width, and height.
 - Imports of egui, Qt Widgets, SwiftUI, GTK, Compose, and Dear ImGui C++ accept UII's emitted calls, not a handwritten app.
 - Raven's Vulkan renderer is not linked. DockArea, the header bar, the island, and VBox are functions in the exported imgui file. The editor window does not call them. Rectangles and ellipses stay canvas shapes.

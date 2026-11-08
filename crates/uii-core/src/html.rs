@@ -58,6 +58,8 @@ fn write_node(doc: &Document, id: NodeId, html: &mut String, css: &mut String, d
     }
     if node.kind == NodeKind::Ellipse {
         css.push_str("  border-radius: 50%;\n");
+    } else if node.corner_radius > 0.0 {
+        css.push_str(&format!("  border-radius: {}px;\n", css_num(node.corner_radius)));
     }
     css.push_str("}\n");
 
@@ -150,6 +152,8 @@ fn inline_extra(node: &crate::document::Node) -> String {
     }
     if node.kind == NodeKind::Ellipse {
         extra.push_str("border-radius:50%;");
+    } else if node.corner_radius > 0.0 {
+        extra.push_str(&format!("border-radius:{}px;", css_num(node.corner_radius)));
     }
     extra
 }
@@ -1099,6 +1103,11 @@ fn place(
         }
         node.color = color;
         node.font_size = font;
+        if let Some(Len::Px(px)) = style.radius {
+            if kind != NodeKind::Ellipse {
+                node.corner_radius = px.max(0.0);
+            }
+        }
         if kind == NodeKind::Text || kind == NodeKind::Button {
             node.text = text.clone();
         }

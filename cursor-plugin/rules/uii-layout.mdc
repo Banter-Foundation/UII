@@ -1,0 +1,10 @@
+---
+description: Read the published UII layout before changing structure, styles, or what a region is for. UII is a native Rust desktop app.
+alwaysApply: false
+---
+
+UII is a native Rust desktop app on Banter's imgui stack (`dear-imgui-rs` 0.22, `dear-imgui-glow` 0.22, GLFW, OpenGL 3.3). It is not a web app.
+
+Before changing a layout, call the `uii-layout` tools `read_layout`, `read_intent`, and `read_region`. The region tree is the structure. Style declarations are the styles. `purpose` is what that region is for. `intent.html` and `intent.css` are Owl's description of the layout, not a site to serve.
+
+Do not invent a purpose when the field is empty. Do not add editor tabs, a dock, or an exporter from this plugin.

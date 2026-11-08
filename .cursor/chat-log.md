@@ -119,3 +119,24 @@ We aren’t doing it that way please do it the way I asked which was adding stuf
 The running app is a native Rust window on Banter's Dear ImGui stack. HTML and CSS are the layout model, and the canvas is the editor. Design and Animation are the only top tabs. Inspect is a tool that reports type, size, and color. Assets and Components are in the Content drawer. Import and export cover the fifteen formats. Cursor talks to the open window through a local socket, not HTTP. Raven was not found in Banter, so that export is generated Rust on dear-imgui-rs. Qt is Widgets, not QML.
 
 Raven is https://github.com/oscar-soirey/Raven at commit 7f4411c376cec8fad2d071d63696b8444ec2640d. Those features are functions in the exported Dear ImGui file, and import reads them. The editor window does not call them and does not link libraven.
+
+Improve the UII editor on main of https://github.com/Banter-Foundation/UII and open a pull request. The app is a native Rust Dear ImGui desktop tool (GLFW, OpenGL, dear-imgui-rs 0.22). Owl says it is worse than Figma. Make the Design canvas feel like a usable layout tool, not a bare shape board.
+
+Do these on the running editor:
+- A layers panel and a properties panel (position, size, fill, type) that stay visible while designing.
+- Snap and alignment when moving, and multi-select.
+- Undo and redo.
+- Frames that clip children and can nest.
+- Text that uses a real font size, and shapes with fill and corner radius.
+- Keep HTML/CSS editing secondary, behind a closed panel.
+- Do not turn this into a web app. Do not fork Dear ImGui. Raven features stay in import/export only.
+
+Also look at the open PRs and merge what main does not already have. They conflict because they were built apart: https://github.com/Banter-Foundation/UII/pull/1 https://github.com/Banter-Foundation/UII/pull/2 https://github.com/Banter-Foundation/UII/pull/3 https://github.com/Banter-Foundation/UII/pull/4 https://github.com/Banter-Foundation/UII/pull/5 https://github.com/Banter-Foundation/UII/pull/6 https://github.com/Banter-Foundation/UII/pull/8. Pull request 7 is already on main. Rebase each, take the pieces main lacks (Inspect, Cursor plugin, assets dock, Animation, import/export, Function, and any shell behavior), and drop duplicates. If a PR is fully redundant, close it with a short comment. If you merge one, say so.
+
+Branch from main. Open one PR for the editor improvements plus anything you folded in. In the PR body, list what changed and which old PRs you merged or closed.
+
+Add keyboard shortcuts to the editor. Include the usual ones: undo, redo, copy, paste, duplicate, delete, select all, group, zoom in and out, and fit. Show them in a short shortcut list in the app. Keep this on the same improvement branch.
+
+## Summary
+
+The Design canvas now keeps layers and properties visible, snaps while moving, supports multi-select, undo, redo, clipping nested frames, font size, fill, and corner radius. Shortcuts are listed in the properties column. HTML and CSS stay closed until opened. Function and the Cursor plugin were folded in from the open pull requests. Inspect, import/export, and the earlier design shell were already on main. The assets drawer gained pin, Ctrl+Space, and click-away. Animation gained easing on the tab main already had.

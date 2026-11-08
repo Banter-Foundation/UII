@@ -4,6 +4,7 @@
 
 mod bridge;
 mod platform;
+mod publish;
 mod view;
 
 use std::env;
@@ -16,7 +17,9 @@ fn main() {
         Some("get") => print_response(&bridge::ask("{\"op\":\"get\"}\n")),
         Some("apply") => {
             let mut body = String::new();
-            io::stdin().read_to_string(&mut body).expect("read layout json");
+            io::stdin()
+                .read_to_string(&mut body)
+                .expect("read layout json");
             print_response(&bridge::ask(&body));
         }
         Some("--help") | Some("-h") | Some("help") => print_help(),

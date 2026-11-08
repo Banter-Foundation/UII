@@ -4,18 +4,22 @@
 
 [*] Empty document on launch.
 
-[*] Design and Animation are the only top tabs. Design is the layout canvas. Animation plays position and size on that canvas without rewriting the design rects.
+[*] Design, Animation, and Function are the top tabs. Design is the layout canvas. Animation plays position and size on that canvas without rewriting the design rects. Function is the behavior graph.
 
-[*] Canvas tools: Select, Frame, Text, Rectangle, Ellipse. Select, move, and resize. Right-drag pans.
+[*] Layers and properties stay visible on Design. Properties edit position, size, fill, and type, plus font size and corner radius.
+
+[*] Canvas tools: Select, Frame, Text, Rectangle, Ellipse. Select, move, resize, multi-select, and snap to edges and centers. Right-drag pans. Frames clip their children and can nest.
+
+[*] Undo, redo, copy, paste, duplicate, delete, select all, group, zoom in, zoom out, and fit. The shortcut list is in the properties column.
 
 [*] Inspect is a tool. With a selection it shows type, size, and color.
 
-[*] Assets and Components stay in the collapsible Content drawer. The drawer starts collapsed.
+[*] Assets and Components stay in the collapsible Content drawer. The drawer starts collapsed. Ctrl+Space toggles it. Pin keeps it open. An unpinned drawer closes on a click outside it.
 
-[*] HTML and CSS stay secondary. The canvas rewrites them, and Apply markup writes them back.
+[*] HTML and CSS stay secondary, behind a closed panel. The canvas rewrites them, and Apply markup writes them back.
 
 [*] Import and export: HTML/CSS, React, Vue, Svelte, Angular, Banter imgui, Raven imgui, Dear ImGui C++, egui, Slint, Qt Widgets, WinUI, SwiftUI, GTK, Jetpack Compose.
 
-[*] Cursor socket on 127.0.0.1: `uii get`, `uii apply`, and `uii mcp` with `get_design` and `apply_layout`.
+[*] Cursor socket on 127.0.0.1: `uii get`, `uii apply`, and `uii mcp` with `get_design` and `apply_layout`. The Cursor plugin `uii-cursor` reads the layout the window publishes.
 
-[ ] Full CSS, real font metrics, decoded images, undo, persistence, and handwritten parsers for egui, Qt, SwiftUI, GTK, Compose, and Dear ImGui C++.
+[ ] Full CSS, decoded images, a design save file, and handwritten parsers for egui, Qt, SwiftUI, GTK, Compose, and Dear ImGui C++.

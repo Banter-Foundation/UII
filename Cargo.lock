@@ -1228,6 +1228,8 @@ dependencies = [
  "dear-imgui-rs",
  "glfw",
  "glow",
+ "serde",
+ "serde_json",
  "uii-animation",
  "uii-core",
  "uii-cursor",

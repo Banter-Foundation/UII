@@ -6,6 +6,7 @@
 mod bridge;
 mod platform;
 mod publish;
+mod theme;
 mod view;
 
 use std::env;

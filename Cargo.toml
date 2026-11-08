@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/uii-core",
+    "crates/uii",
+    "crates/uii-function",
+    "crates/uii-animation",
+    "crates/uii-animation-host",
+    "cursor-plugin",
+]

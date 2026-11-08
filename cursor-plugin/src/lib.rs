@@ -34,7 +34,7 @@ pub use model::{
     Bounds, Declaration, LayoutError, LayoutSnapshot, Region, RegionDetail, RegionPurpose, Style,
     UiIntent, FORMAT_VERSION,
 };
-pub use paths::snapshot_path_from;
+pub use paths::{default_snapshot_path, snapshot_path_from};
 pub use plug::{
     discover, fetch_live, options_from_env, read_current, read_snapshot, write_snapshot,
     LayoutPlug, ReadOptions,

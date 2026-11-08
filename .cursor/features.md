@@ -4,12 +4,22 @@
 
 [*] Empty document on launch.
 
-[*] Top tabs are Design, Animation, and Function. Design is the layout canvas. Animation and Function are empty placeholders. The Function tab is not named Prototype.
+[*] Design, Animation, and Function are the top tabs. Design is the layout canvas. Animation plays position and size on that canvas without rewriting the design rects. Function is the behavior graph.
 
-[*] Design canvas: Select, Frame, Text, Rectangle, Ellipse. Select, move, and resize. Right-drag pans. Layers list the document.
+[*] Layers and properties stay visible on Design. Properties edit position, size, fill, and type, plus font size and corner radius.
 
-[*] HTML and CSS are a secondary panel. The canvas rewrites them, and Apply markup writes them back.
+[*] Canvas tools: Select, Frame, Text, Rectangle, Ellipse. Select, move, resize, multi-select, and snap to edges and centers. Right-drag pans. Frames clip their children and can nest.
 
-[*] `content_dock.rs` and `inspect.rs` are empty hooks the shell calls. They are not a dock and not an Inspect tool.
+[*] Undo, redo, copy, paste, duplicate, delete, select all, group, zoom in, zoom out, and fit. The shortcut list is in the properties column.
 
-[ ] Animation playback, Function connections, the Assets and Components dock, Inspect, multi-format import and export, and the Cursor plugin. Other agents own those.
+[*] Inspect is a tool. With a selection it shows type, size, and color.
+
+[*] Assets and Components stay in the collapsible Content drawer. The drawer starts collapsed. Ctrl+Space toggles it. Pin keeps it open. An unpinned drawer closes on a click outside it.
+
+[*] HTML and CSS stay secondary, behind a closed panel. The canvas rewrites them, and Apply markup writes them back.
+
+[*] Import and export: HTML/CSS, React, Vue, Svelte, Angular, Banter imgui, Raven imgui, Dear ImGui C++, egui, Slint, Qt Widgets, WinUI, SwiftUI, GTK, Jetpack Compose.
+
+[*] Cursor socket on 127.0.0.1: `uii get`, `uii apply`, and `uii mcp` with `get_design` and `apply_layout`. The Cursor plugin `uii-cursor` reads the layout the window publishes.
+
+[ ] Full CSS, decoded images, a design save file, and handwritten parsers for egui, Qt, SwiftUI, GTK, Compose, and Dear ImGui C++.

@@ -21,7 +21,6 @@ pub fn import_html_css(html: &str, css: &str) -> Document {
     doc
 }
 
-#[allow(dead_code)]
 pub(crate) fn export_html_document(doc: &Document) -> String {
     let (markup, css) = html_and_css_parts(doc);
     format!("<style>\n{css}</style>\n{markup}")
@@ -59,6 +58,8 @@ fn write_node(doc: &Document, id: NodeId, html: &mut String, css: &mut String, d
     }
     if node.kind == NodeKind::Ellipse {
         css.push_str("  border-radius: 50%;\n");
+    } else if node.corner_radius > 0.0 {
+        css.push_str(&format!("  border-radius: {}px;\n", css_num(node.corner_radius)));
     }
     css.push_str("}\n");
 
@@ -151,6 +152,8 @@ fn inline_extra(node: &crate::document::Node) -> String {
     }
     if node.kind == NodeKind::Ellipse {
         extra.push_str("border-radius:50%;");
+    } else if node.corner_radius > 0.0 {
+        extra.push_str(&format!("border-radius:{}px;", css_num(node.corner_radius)));
     }
     extra
 }
@@ -427,7 +430,7 @@ fn read_until_close(chars: &[char], i: &mut usize, tag: &str) -> String {
 
 fn read_name(chars: &[char], i: &mut usize) -> String {
     let start = *i;
-    while *i < chars.len() && (chars[*i].is_ascii_alphanumeric() || chars[*i] == '-' || chars[*i] == ':') {
+    while *i < chars.len() && (chars[*i].is_ascii_alphanumeric() || chars[*i] == '-' || chars[*i] == ':' || chars[*i] == '.') {
         *i += 1;
     }
     chars[start..*i].iter().collect()
@@ -1100,6 +1103,11 @@ fn place(
         }
         node.color = color;
         node.font_size = font;
+        if let Some(Len::Px(px)) = style.radius {
+            if kind != NodeKind::Ellipse {
+                node.corner_radius = px.max(0.0);
+            }
+        }
         if kind == NodeKind::Text || kind == NodeKind::Button {
             node.text = text.clone();
         }
@@ -1386,7 +1394,6 @@ fn measure(text: &str, font: f32) -> (f32, f32) {
     (width, height)
 }
 
-#[allow(dead_code)]
 pub(crate) struct MarkupNode {
     pub tag: String,
     pub attrs: Vec<(String, String)>,
@@ -1394,13 +1401,11 @@ pub(crate) struct MarkupNode {
     pub children: Vec<MarkupNode>,
 }
 
-#[allow(dead_code)]
 pub(crate) fn parse_markup(src: &str) -> Vec<MarkupNode> {
     let (roots, _) = parse_fragment(src);
     roots.into_iter().map(el_to_markup).collect()
 }
 
-#[allow(dead_code)]
 fn el_to_markup(el: El) -> MarkupNode {
     let mut text = String::new();
     let mut children = Vec::new();

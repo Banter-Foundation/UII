@@ -1,6 +1,7 @@
 //! GLFW, OpenGL 3.3, and Banter's dear-imgui-rs 0.22. Docking is enabled
 //! before the first frame. The window thread owns the editor.
 
+use crate::bridge::{self, Job};
 use crate::view::View;
 use dear_imgui_glow::GlowRenderer;
 use dear_imgui_rs::{ConfigFlags, Context, Key};
@@ -13,7 +14,9 @@ use uii_core::Editor;
 pub fn run() -> Result<(), String> {
     let mut glfw = glfw::init(glfw::fail_on_errors).map_err(|err| err.to_string())?;
     glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
-    glfw.window_hint(glfw::WindowHint::OpenGlProfile(glfw::OpenGlProfileHint::Core));
+    glfw.window_hint(glfw::WindowHint::OpenGlProfile(
+        glfw::OpenGlProfileHint::Core,
+    ));
     glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));
     glfw.window_hint(glfw::WindowHint::ScaleToMonitor(true));
 
@@ -39,21 +42,38 @@ pub fn run() -> Result<(), String> {
     let mut renderer = GlowRenderer::with_shared_context(Rc::clone(&gl), &mut imgui)
         .map_err(|err| format!("imgui renderer: {err}"))?;
 
+    let jobs = bridge::start();
     let mut editor = Editor::new();
     let mut view = View::new();
-    let mut last = Instant::now();
+    view.load_library(&mut editor);
+    let plug = uii_cursor::LayoutPlug::bind().ok();
+    let snapshot_path = uii_cursor::default_snapshot_path();
+    let mut published = u64::MAX;
+    let started = Instant::now();
+    let mut last = started;
 
     while !window.should_close() {
         glfw.poll_events();
         feed(&mut imgui, &events);
+        while let Ok(job) = jobs.incoming.try_recv() {
+            answer(&mut editor, job);
+        }
 
         let now = Instant::now();
         let dt = (now - last).as_secs_f32().clamp(1.0 / 240.0, 0.1);
         last = now;
         let (width, height) = window.get_size();
         let (fb_w, fb_h) = window.get_framebuffer_size();
-        let scale_x = if width > 0 { fb_w as f32 / width as f32 } else { 1.0 };
-        let scale_y = if height > 0 { fb_h as f32 / height as f32 } else { 1.0 };
+        let scale_x = if width > 0 {
+            fb_w as f32 / width as f32
+        } else {
+            1.0
+        };
+        let scale_y = if height > 0 {
+            fb_h as f32 / height as f32
+        } else {
+            1.0
+        };
         {
             let io = imgui.io_mut();
             io.set_display_size([width as f32, height as f32]);
@@ -66,7 +86,17 @@ pub fn run() -> Result<(), String> {
             gl.clear(glow::COLOR_BUFFER_BIT);
         }
         let ui = imgui.frame();
-        view.draw(&ui, &mut editor);
+        view.draw(&ui, &mut editor, dt);
+        view.save_library(&mut editor);
+        view.save_motion();
+        if editor.revision() != published {
+            if let Some(plug) = &plug {
+                if let Ok(snapshot) = crate::publish::snapshot(&editor) {
+                    let _ = plug.publish_to(snapshot, &snapshot_path);
+                }
+            }
+            published = editor.revision();
+        }
         let consumer = renderer
             .renderer_consumer()
             .map_err(|err| format!("imgui consumer: {err}"))?;
@@ -76,7 +106,15 @@ pub fn run() -> Result<(), String> {
             .map_err(|err| format!("imgui render: {err}"))?;
         window.swap_buffers();
     }
+    view.save_library(&mut editor);
+    view.save_motion();
+    view.save_function();
     Ok(())
+}
+
+fn answer(editor: &mut Editor, job: Job) {
+    let response = editor.cursor(job.request.trim());
+    let _ = job.reply.send(response);
 }
 
 fn feed(imgui: &mut Context, events: &GlfwReceiver<(f64, WindowEvent)>) {

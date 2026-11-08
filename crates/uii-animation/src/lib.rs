@@ -4,19 +4,19 @@
 //! the same docking branch Banter ships). This crate is only the Animation
 //! tab: clips, property tracks, and keyframes that move layout nodes.
 //!
-//! The shell is not on `main` yet, so the tab lives here and can be merged
-//! later. Register [`TAB_ID`] / [`TAB_LABEL`] and call [`draw_animation_tab`]
-//! inside that tab. [`AnimationTab::posed_layout`] is the layout with motion
-//! applied at the playhead. [`NodeId`] is a `u32` newtype so it can match the
-//! design document's node id when that crate lands.
+//! The editor window hosts this tab. Register [`TAB_ID`] / [`TAB_LABEL`] and
+//! call [`draw_animation_tab`] inside the Animation tab.
+//! [`AnimationTab::posed_layout`] is the layout with motion applied at the
+//! playhead. [`NodeId`] is a `u32` newtype matching the design document.
+//! [`load_animation`] and [`save_animation`] read and write the clip file.
 //!
-//! The standalone host is `uii-animation-host`. It opens one window and draws
-//! this tab. It does not implement Design, Function, the assets dock, Inspect,
-//! import/export, or the Cursor plugin.
+//! `uii-animation-host` can still open the same tab in its own window. The
+//! editor is the host that runs with Design and Function.
 
 mod draw;
 mod easing;
 mod model;
+mod store;
 mod tab;
 mod timeline;
 
@@ -26,6 +26,7 @@ pub use model::{
     apply_pose, AnimationError, AnimationProject, ChannelSample, Clip, ClipId, Keyframe,
     KeyframeId, LayoutNode, MotionProperty, NodeId, Pose, Track, TrackId,
 };
+pub use store::{animation_path, load_animation, save_animation, AnimationFile};
 pub use tab::{AnimationTab, Playback};
 pub use timeline::{
     active_key_refs, fit_preview, hit_keyframe, rotated_corners, timeline_rows, KeyRef,

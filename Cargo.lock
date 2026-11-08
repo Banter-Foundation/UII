@@ -1221,6 +1221,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "uii"
+version = "0.1.0"
+dependencies = [
+ "dear-imgui-glow",
+ "dear-imgui-rs",
+ "glfw",
+ "glow",
+ "uii-animation",
+ "uii-core",
+ "uii-cursor",
+ "uii-function",
+]
+
+[[package]]
 name = "uii-animation"
 version = "0.1.0"
 dependencies = [
@@ -1238,6 +1252,32 @@ dependencies = [
  "glfw",
  "glow",
  "uii-animation",
+]
+
+[[package]]
+name = "uii-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "uii-cursor"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "uii-function"
+version = "0.1.0"
+dependencies = [
+ "dear-imgui-glow",
+ "dear-imgui-rs",
+ "glfw",
+ "glow",
 ]
 
 [[package]]

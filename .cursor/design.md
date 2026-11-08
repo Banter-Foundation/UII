@@ -1,23 +1,39 @@
-# Animation tab
+# Design
 
-One Dear ImGui surface. The host draws it in a 1440×900 window titled `UII — Animation`. The shell should give this the same content region later.
+The window is one surface. The canvas is the large area. Code is not the main screen.
 
-## Transport
+## Top
 
-First row: the word Animation, the clip combo, Add clip, Duplicate, Delete clip, the clip name, duration, and Loop.
+A tab bar with three tabs: Design, Animation, and Function. Assets, Components, and Inspect are not tabs.
 
-Second row: Play or Pause, Stop, the playhead time, Undo, and Redo.
+Under the tabs, a tool row: Select, Frame, Text, Rectangle, Ellipse, Inspect, then Delete, Import, Export, and HTML / CSS.
+
+The active tool is drawn in brackets. Inspect, when it is the active tool, adds one line under the tools. With a selection that line is the type, the size, and the color. With no selection it asks for one.
+
+HTML / CSS opens two editors, HTML and CSS, plus Apply markup and Reload from canvas. It starts closed.
 
 ## Body
 
-Three columns.
+A layers list on the left, about 200px, and a properties column on the right, about 250px. Both stay visible on Design and Animation. Properties shows type, position, size, and fill for the selection. Text also shows font size. Rectangles and frames also show corner radius. The shortcut list sits under the properties.
 
-- Layout targets, about 248px. Add target, the target list, and the rest pose (name, X, Y, width, height, rotation, opacity, fill).
-- Timeline. A ruler in seconds, then one row per property of the selected target. Other targets show only properties that already have keys. Keys are diamonds. The playhead is an orange line. The wheel zooms around the cursor. The middle button pans.
-- Keyframe inspector, about 268px. Time, value, easing, and delete. Easing is Linear, Ease In, Ease Out, Ease In Out, Hold, or Cubic Bezier.
+The canvas is the area between those columns. Objects are drawn from the document. On the Animation tab they are drawn from the playhead. The selection has a blue outline and eight handles. Shift-click adds to the selection. Dragging on empty space selects what the rectangle covers. Moving snaps edges and centers to other objects and draws a guide. Frames clip their children. A new shape dropped on a selected frame is parented inside it.
 
-## Motion preview
+The canvas starts empty. There is no sample layout.
 
-Under the columns, at least 140px tall. The rest pose is a gray outline. The playhead pose is the filled box, with the target name. The frame fits both, so the box moves instead of the view recentering on it.
+Zoom is Ctrl+= and Ctrl+-. Fit is Shift+1. The percentage is on the tool row.
 
-Empty states: no clip, no target, and no selected key each say what to add. Nothing is seeded.
+## Animation
+
+Under the canvas, only on the Animation tab: Play / Pause, Key, and a time slider. Key stores x, y, width, and height of the selection at the playhead. Dragging on this tab writes keys, not the design rect.
+
+## Function
+
+The Function tab is the behavior graph: triggers, actions, values, and the wires between them. It saves `function.graph` under the UII data directory. Ctrl+S saves it.
+
+## Content drawer
+
+A Content row at the bottom. It starts as `Content  >`. Ctrl+Space toggles it. Pin keeps it open; without a pin, a click outside the drawer closes it. Opening it shows Assets and Components and the page for the one that is selected. Assets take a path, Add, and Place. Components take a name, Save selection, and Insert.
+
+## Import and export
+
+Import and Export are separate windows, not the canvas. Each lists the fifteen formats. HTML and CSS import has two fields. The other formats have one source field. Export shows the generated file.

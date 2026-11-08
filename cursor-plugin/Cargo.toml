@@ -1,0 +1,15 @@
+[package]
+name = "uii-cursor"
+version = "0.1.0"
+edition = "2021"
+description = "Cursor plug that reads the current UII layout: structure, styles, region purpose, and Owl's UI intent."
+license = "MIT OR Apache-2.0"
+publish = false
+
+[[bin]]
+name = "uii-cursor"
+path = "src/bin/uii-cursor.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

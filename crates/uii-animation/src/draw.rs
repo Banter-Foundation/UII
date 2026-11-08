@@ -62,7 +62,7 @@ fn shortcuts(ui: &Ui, tab: &mut AnimationTab) {
         return;
     }
     let (duration, looping) = tab.active_timing();
-    if ui.is_key_pressed(Key::Space) {
+    if ui.is_key_pressed(Key::Space) && !ui.io().key_ctrl() {
         if tab.playback.playing {
             tab.playback.pause();
         } else {

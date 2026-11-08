@@ -1,8 +1,8 @@
 //! Standalone window for the Animation tab.
 //!
-//! The shell is not on `main` yet. This host is the piece that can run the tab
-//! on its own. When the shell lands, it should call `uii_animation::draw_animation_tab`
-//! instead of opening a second application window.
+//! The editor in `uii` is the host: it calls `draw_animation_tab` and uses the
+//! same clip file. This binary opens that tab on its own when you want the
+//! timeline without the rest of the editor.
 
 use std::rc::Rc;
 
@@ -22,27 +22,12 @@ fn main() {
 }
 
 fn run() -> Result<(), String> {
-    let path = project_path();
+    let path = uii_animation::animation_path();
+    let loaded = uii_animation::load_animation(&path)?;
     let mut tab = AnimationTab::new();
-    match std::fs::read_to_string(&path) {
-        Ok(text) if !text.trim().is_empty() => {
-            match uii_animation::AnimationProject::from_json(&text) {
-                Ok(project) => tab.project = project,
-                Err(err) => {
-                    let backup = path.with_extension("json.bad");
-                    let _ = std::fs::copy(&path, &backup);
-                    tab.set_status(format!(
-                        "Could not read {}. Left the file in place and copied it to {}.",
-                        path.display(),
-                        backup.display()
-                    ));
-                    let _ = err;
-                }
-            }
-        }
-        Ok(_) => {}
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-        Err(err) => return Err(format!("read {}: {err}", path.display())),
+    tab.project = loaded.project;
+    if !loaded.status.is_empty() {
+        tab.set_status(loaded.status);
     }
 
     let frame_limit = std::env::var("UII_ANIMATION_FRAMES")
@@ -135,7 +120,7 @@ fn run() -> Result<(), String> {
         renderer.render(pending).map_err(|err| err.to_string())?;
         window.swap_buffers();
         if tab.is_dirty() {
-            save_project(&path, &tab)?;
+            uii_animation::save_animation(&path, &tab.project)?;
             let _ = tab.take_dirty();
         }
         frames += 1;
@@ -144,32 +129,10 @@ fn run() -> Result<(), String> {
         }
     }
     if tab.is_dirty() {
-        save_project(&path, &tab)?;
+        uii_animation::save_animation(&path, &tab.project)?;
         let _ = tab.take_dirty();
     }
     Ok(())
-}
-
-fn save_project(path: &std::path::Path, tab: &AnimationTab) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|err| format!("create {}: {err}", parent.display()))?;
-    }
-    std::fs::write(path, tab.project.to_json())
-        .map_err(|err| format!("write {}: {err}", path.display()))
-}
-
-fn project_path() -> std::path::PathBuf {
-    if let Some(path) = std::env::var_os("UII_ANIMATION_PATH") {
-        return std::path::PathBuf::from(path);
-    }
-    let base = std::env::var_os("XDG_DATA_HOME")
-        .map(std::path::PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".local/share"))
-        })
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
-    base.join("uii").join("animation.json")
 }
 
 fn glfw_error(code: glfw::Error, description: String) {

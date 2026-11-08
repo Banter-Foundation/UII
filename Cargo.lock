@@ -1273,6 +1273,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "uii-dock"
+version = "0.1.0"
+dependencies = [
+ "dear-imgui-glow",
+ "dear-imgui-rs",
+ "glfw",
+ "glow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "uii-function"
 version = "0.1.0"
 dependencies = [

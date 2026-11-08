@@ -1,0 +1,16 @@
+{
+  "name": "uii",
+  "owner": {
+    "name": "Banter Foundation"
+  },
+  "metadata": {
+    "description": "Plugins for the UII layout tool."
+  },
+  "plugins": [
+    {
+      "name": "uii-cursor",
+      "source": "cursor-plugin",
+      "description": "Read the current UII layout: structure, styles, what each region is for, and Owl's UI intent."
+    }
+  ]
+}

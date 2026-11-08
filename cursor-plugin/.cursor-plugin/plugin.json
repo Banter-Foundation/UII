@@ -1,0 +1,13 @@
+{
+  "name": "uii-cursor",
+  "displayName": "UII Layout",
+  "version": "0.1.0",
+  "description": "Read the current UII layout: structure, styles, what each region is for, and Owl's UI intent.",
+  "author": {
+    "name": "Banter Foundation"
+  },
+  "repository": "https://github.com/Banter-Foundation/UII",
+  "license": "MIT OR Apache-2.0",
+  "keywords": ["uii", "layout", "imgui", "cursor-plugin"],
+  "category": "developer-tools"
+}

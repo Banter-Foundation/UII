@@ -1,50 +1,114 @@
 # UII
 
-Import and export a UI document. The host application stays native Rust on Banter imgui (`dear-imgui-rs` 0.22, GLFW, OpenGL, docking enabled before the first frame). This repository is the call point. It does not open a window and it does not draw an editor.
+UII is a native layout editor for Owl. The window is a Rust desktop app on the same Dear ImGui stack Banter uses (`dear-imgui-rs` 0.22, `dear-imgui-glow` 0.22, `glow` 0.18, GLFW 0.63, OpenGL 3.3). It is not a website and it does not serve HTTP.
 
-```rust
-let source = uii::export(uii::Format::DearImgui, &document)?;
-let document = uii::import(uii::Format::HtmlCss, html)?;
-uii::call(uii::Call::Export { format, document })?;
+The layout itself is HTML and CSS, because that is how a layout is described. The screen you work on is the canvas: select, move, resize, and draw. HTML and CSS are there when you want them, off to the side.
+
+## Install
+
+You need Rust new enough for `dear-imgui-rs` 0.22. That crate's build uses Cargo edition 2024. Rust 1.83 cannot fetch it. This tree was built with Rust 1.99.
+
+On Linux, install a C++ compiler and the libraries GLFW needs:
+
+```bash
+sudo apt install build-essential cmake pkg-config \
+  libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev \
+  libxcursor-dev libxi-dev libxext-dev libwayland-dev libxkbcommon-dev
 ```
 
-The `uii` binary is the same call on stdin and stdout:
+If `c++` is Clang and the Dear ImGui build stops on a missing `<climits>`, build with `CXX=g++`. If the link step cannot find `libstdc++`, add the GCC library directory to `LIBRARY_PATH` (on the machine used to build this tree, that was `/usr/lib/gcc/x86_64-linux-gnu/13`).
 
+GLFW is built by the `glfw` crate. A system GLFW package is not required.
+
+## Run
+
+```bash
+cargo run -p uii
 ```
-uii import html-css < page.html
-uii export dear-imgui < document.json
-```
 
-An unknown format exits 2. A conversion error exits 1.
+The window opens on an empty document. Nothing is seeded.
 
-## Formats
+The top of the window has three tabs:
 
-Both directions, and a round trip compares equal:
+- **Design** is the layout canvas. Layers stay on the left and properties stay on the right: position, size, fill, and type. Text uses its font size. Rectangles and frames have a fill and a corner radius. Frames clip their children and can nest.
+- **Animation** is the same canvas plus the animation host: clips, property tracks, a timeline, and a motion preview. The clip file is `animation.json` (`UII_ANIMATION_PATH` overrides it). Playing a clip does not write the sampled pose back over the design.
+- **Function** is the behavior graph. Save writes `function.graph` under the UII data directory.
 
-| Format | Name |
+The tools on Design and Animation are Select, Frame, Text, Rectangle, Ellipse, and Inspect. Inspect is a tool. When an object is selected it shows that object's type, size, and color. It is not a tab. The properties column shows the same selection while you are designing, including position and fill.
+
+Shift-click adds to the selection. Dragging on empty canvas selects everything the rectangle covers. Moving snaps edges and centers to other objects. Undo is Ctrl+Z. The full shortcut list is in the properties column: undo, redo, copy, paste, duplicate, delete, select all, group, zoom in, zoom out, and fit.
+
+**Assets** and **Components** are in the Content drawer at the bottom. It starts collapsed. Ctrl+Space toggles it. Pin keeps it open; otherwise a click outside closes it. The drawer is a folder library: create folders, put assets inside them, and save a selection as a component. That tree is `library.json` under `UII_DATA`, or the platform UII data directory. A path can still be added and placed on the canvas.
+
+**HTML / CSS** opens the markup for the current canvas. Apply writes it back onto the canvas. It starts closed. Leave it closed while you draw.
+
+Drag with the right mouse button to pan the canvas. Delete removes the selection.
+
+## Import and export
+
+Import and Export are buttons on the tool row. Every format can be imported and exported:
+
+| Id | What it is |
 | --- | --- |
-| HTML/CSS | `html-css` (`html`, `html/css`) |
-| React | `react` |
-| Vue | `vue` |
-| Svelte | `svelte` |
-| Angular | `angular` |
-| Banter imgui | `banter-imgui` (`banter`) |
-| Raven imgui | `custom-imgui` (`raven`, `raven-imgui`) |
-| Dear ImGui C++ | `dear-imgui` (`imgui`, `dear-imgui-c++`) |
-| egui | `egui` |
-| Slint | `slint` |
-| Qt | `qt` |
-| WinUI | `winui` |
-| SwiftUI | `swiftui` |
-| GTK | `gtk` |
-| Jetpack Compose | `jetpack-compose` (`compose`, `jetpack`) |
+| `html-css` | HTML and CSS |
+| `react` | React function component, JSX and CSS |
+| `vue` | Vue single-file component |
+| `svelte` | Svelte component |
+| `angular` | Angular component |
+| `banter-imgui` | Rust on `dear-imgui-rs` 0.22, the same crate the window uses |
+| `raven-imgui` | Generated Rust in a `mod raven` that calls `dear-imgui-rs` |
+| `imgui-cpp` | Dear ImGui C++ notes plus the layout calls |
+| `egui` | egui notes plus the layout calls |
+| `slint` | Slint |
+| `qt-widgets` | Qt Widgets |
+| `winui` | WinUI |
+| `swiftui` | SwiftUI |
+| `gtk` | GTK 4 |
+| `compose` | Jetpack Compose |
 
-HTML `header`, `nav`, `main` / `section` / `article`, `aside`, and `footer` become dock regions (top, left, center, right, bottom). A `table` stays a table. Nested boxes become child windows where the target has them: Banter imgui, the Raven imgui file, and Dear ImGui C++. The other targets keep their own panels, stacks, and layouts and do not emit `BeginChild` or `ui.child_window`.
+Qt is **Qt Widgets**, not QML. The export says so. Docking is `QDockWidget` on a `QMainWindow`, tables are `QTableWidget`, and nested boxes are child `QWidget`s.
 
-Code formats carry one `// uii` or `<!-- uii -->` record per node plus the toolkit's own calls. Import rebuilds the tree from the records, then rejects the file when a required call is missing (for example `ImGui::DockSpace`).
+Raven is [oscar-soirey/Raven](https://github.com/oscar-soirey/Raven), commit `7f4411c376cec8fad2d071d63696b8444ec2640d`. It is a C GUI library, not a Dear ImGui fork and not a crate inside Banter. The editor window stays on Banter's Dear ImGui (`dear-imgui-rs` 0.22 and `dear-imgui-glow` 0.22). The Raven export is a separate file of that same imgui, with functions added for export and import: `imgui_dock_area`, `imgui_header_bar`, `imgui_island`, and `imgui_vbox`, plus label, button, image, and table. Those functions call Dear ImGui's dockspace, windows, child windows, and tables (`include/raven/raven_shell.h`, `include/raven/raven_controls.h`). The window does not compile that file and does not link `libraven`.
 
-## Raven
+Where the toolkit has no dock widget, the export still carries the layout and names the closest equivalent:
 
-Banter's repository has no Raven symbol. The custom imgui format follows the public C API in [oscar-soirey/Raven](https://github.com/oscar-soirey/Raven): `Rdock_area_create`, `Rdock_area_add_panel`, `R_DOCK_LEFT` / `RIGHT` / `TOP` / `BOTTOM` / `TAB` (there is no center side; the center panel is the first tab), `R_WIDGET_TABLE` with `Rtable_add_column`, `Rtable_add_row`, and `Rtable_set_cell`, plus `R_WIDGET_VBOX`, `R_WIDGET_HBOX`, `Rheader_bar_create`, and `R_WIDGET_ISLAND`. That file also emits Dear ImGui docking, tables, and child windows. The records are written once, in the Dear ImGui half.
+- egui has no dockspace. The note uses `egui_dock` (`DockState`, `split_above`).
+- Slint has no dock widget. The file is a `Window` with `StandardTableView` and rectangles.
+- SwiftUI uses `NavigationSplitView` and `Table`.
+- GTK 4 uses `gtk_paned_new` and `gtk_grid_attach`.
+- Compose uses `Scaffold`.
+- Dear ImGui C++ uses `DockBuilderSplitNode`, `DockSpace`, `BeginChild`, and `BeginTable`.
+- WinUI uses a `DockPanel`.
 
-Banter imgui text uses the `dear-imgui-rs` 0.22 calls Banter already links (`ui.dockspace`, `DockLayout`, `child_window`, `ui.table`) and `layout::Region` for the shell slugs. This crate does not depend on `dear-imgui-rs`.
+HTML regions become docks, HTML tables become tables, and nested boxes become child windows. Text, buttons, images, and frames are included, and so are rectangles and ellipses drawn on the canvas.
+
+Banter import reads the Dear ImGui calls that export emits. Raven import reads the functions added to the exported imgui (`imgui_dock_area`, `imgui_vbox`, `imgui_label`, `imgui_button`, `imgui_table`, `imgui_image`). Slint and WinUI imports read their own files. The other native imports read the `uii_dock`, `uii_frame`, `uii_child`, `uii_text`, `uii_button`, `uii_image`, `uii_table`, `uii_rectangle`, and `uii_ellipse` calls that UII writes next to the toolkit notes. They do not parse arbitrary egui, Qt, Swift, GTK, or Compose source.
+
+## Cursor
+
+The running window listens on `127.0.0.1`. The port is `47321`, or the next free port up to `47328`. It writes the port to `$XDG_RUNTIME_DIR/uii.port`, or `/tmp/uii.port` when that directory is unset. This is a line of JSON in and a line of JSON out. It is not a web server.
+
+With the window open:
+
+```bash
+uii get
+uii apply <<'EOF'
+{"op":"apply","html":"<header class=\"bar\">Title</header>","css":"header.bar { height: 40px; }"}
+EOF
+```
+
+`get` returns the HTML, the CSS, and a `regions` list. Each region has a purpose, such as `Top dock for bar` or `Text Title`. `apply` replaces the open design.
+
+`uii mcp` speaks MCP on stdin and stdout (Content-Length frames) and forwards to that socket. The tools are `get_design` and `apply_layout`. `.cursor/mcp.json` starts it with `cargo run -p uii --quiet -- -- mcp`. Start the window first. `get` and `apply` do nothing useful until it is open.
+
+The Cursor plugin in `cursor-plugin/` is separate. The window publishes the open layout on loopback and writes `layout.json` for `uii-cursor`. The tools there are `read_layout`, `read_intent`, and `read_region`. HTML and CSS in that snapshot are the description of the layout. The plugin does not serve a page.
+
+## What is missing
+
+- CSS is a layout subset: size, position, color, font size, border radius, and simple selectors. No flex, grid, media queries, or generated content.
+- HTML import still estimates text width with a fixed factor. The canvas draws text at the node's font size.
+- Images are paths. The canvas does not decode the file.
+- The design itself has no save file. The function graph does. There is no collaboration.
+- Animation keys are x, y, width, and height.
+- Imports of egui, Qt Widgets, SwiftUI, GTK, Compose, and Dear ImGui C++ accept UII's emitted calls, not a handwritten app.
+- Raven's Vulkan renderer is not linked. DockArea, the header bar, the island, and VBox are functions in the exported imgui file. The editor window does not call them. Rectangles and ellipses stay canvas shapes.

@@ -2,10 +2,19 @@
 name = "uii"
 version = "0.1.0"
 edition = "2021"
-description = "Import and export UI documents. Host stays native Rust on Banter imgui; this crate is the call point and does not draw an editor."
+description = "UII native layout editor."
 license = "MIT OR Apache-2.0"
-publish = false
+
+[[bin]]
+name = "uii"
+path = "src/main.rs"
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+uii-core = { path = "../uii-core" }
+uii-animation = { path = "../uii-animation" }
+uii-cursor = { path = "../../cursor-plugin" }
+uii-function = { path = "../uii-function", features = ["desktop"] }
+dear-imgui-rs = "0.22"
+dear-imgui-glow = "0.22"
+glow = "0.18"
+glfw = "0.63"

@@ -2,9 +2,9 @@
 //!
 //! The arrangement follows Figma: a slim tool bar, layers on the left, the
 //! canvas in the middle, properties on the right, and a collapsible dock
-//! along the bottom. Surfaces are neutral dark gray. The accent is a dark
-//! navy, used for the active tool, the selected tab, and the selection.
-//! Type is 14px, inset is 8–12px, and corners are 4px.
+//! along the bottom. The materials follow macOS dark mode: system gray
+//! surfaces, white labels, and system blue for the active control and the
+//! selection. Type is 14px, inset is 12px, and controls use a 6px corner.
 
 use dear_imgui_rs::{FontAtlas, FontSource, StbTrueTypeFontData, Style, StyleColor};
 
@@ -27,24 +27,28 @@ const fn rgb(hex: u32) -> [f32; 4] {
     ]
 }
 
-/// Toolbar, tab strip, and dock bar.
-pub const CHROME: [f32; 4] = rgb(0x1C1C_1C);
-/// Layers, properties, and dock body.
-pub const PANEL: [f32; 4] = rgb(0x2A2A_2A);
-/// Design surface. Darker than the panels so frames read as objects.
-pub const CANVAS: [f32; 4] = rgb(0x1414_14);
-pub const INPUT: [f32; 4] = rgb(0x1C1C_1C);
-pub const HOVER: [f32; 4] = rgb(0x3333_33);
-/// Selected layer row. A navy wash on the gray panel.
-pub const ROW_SELECTED: [f32; 4] = rgb(0x1A2C_44);
-pub const DIVIDER: [f32; 4] = rgb(0x3A3A_3A);
-pub const TEXT: [f32; 4] = rgb(0xE6E6_E6);
-pub const MUTED: [f32; 4] = rgb(0x8E8E_8E);
-/// Dark navy. Active tool, selected tab, and the canvas selection.
-pub const ACCENT: [f32; 4] = rgb(0x1B3F_73);
-pub const ACCENT_HOVER: [f32; 4] = rgb(0x2452_8F);
+/// Toolbar, tab strip, and dock bar. macOS elevated material.
+pub const CHROME: [f32; 4] = rgb(0x2C2C_2E);
+/// Layers, properties, and dock body. macOS sidebar.
+pub const PANEL: [f32; 4] = rgb(0x1C1C_1E);
+/// Design surface. Black, so frames sit on it the way they do in Keynote.
+pub const CANVAS: [f32; 4] = rgb(0x0000_00);
+/// Filled fields. systemGray5.
+pub const INPUT: [f32; 4] = rgb(0x2C2C_2E);
+/// Hovered control. systemGray4.
+pub const HOVER: [f32; 4] = rgb(0x3A3A_3C);
+/// Selected layer row. systemBlue, with the white label on top.
+pub const ROW_SELECTED: [f32; 4] = rgb(0x0A84_FF);
+pub const DIVIDER: [f32; 4] = rgb(0x3838_3A);
+pub const TEXT: [f32; 4] = rgb(0xFFFF_FF);
+/// Secondary label. systemGray.
+pub const MUTED: [f32; 4] = rgb(0x8E8E_93);
+/// systemBlue. Active tool, selected tab, and the canvas selection.
+pub const ACCENT: [f32; 4] = rgb(0x0A84_FF);
+pub const ACCENT_HOVER: [f32; 4] = rgb(0x409C_FF);
 pub const WHITE: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
-pub const TOOL: [f32; 4] = rgb(0x2A2A_2A);
+/// Resting tool capsule. systemGray4 on the darker toolbar.
+pub const TOOL: [f32; 4] = rgb(0x3A3A_3C);
 
 pub fn clear_color() -> [f32; 3] {
     [CANVAS[0], CANVAS[1], CANVAS[2]]
@@ -56,18 +60,18 @@ pub fn apply(style: &mut Style) {
     style.set_window_border_size(0.0);
     style.set_child_rounding(0.0);
     style.set_child_border_size(0.0);
-    style.set_popup_rounding(6.0);
-    style.set_frame_padding([8.0, 3.0]);
-    style.set_frame_rounding(4.0);
+    style.set_popup_rounding(10.0);
+    style.set_frame_padding([10.0, 4.0]);
+    style.set_frame_rounding(6.0);
     style.set_frame_border_size(0.0);
     style.set_item_spacing([8.0, 6.0]);
     style.set_item_inner_spacing([6.0, 4.0]);
     style.set_indent_spacing(16.0);
     style.set_scrollbar_size(10.0);
-    style.set_scrollbar_rounding(4.0);
-    style.set_grab_rounding(4.0);
-    style.set_tab_rounding(4.0);
-    style.set_selectable_rounding(4.0);
+    style.set_scrollbar_rounding(6.0);
+    style.set_grab_rounding(6.0);
+    style.set_tab_rounding(6.0);
+    style.set_selectable_rounding(6.0);
     style.set_selectable_text_align([0.0, 0.5]);
     style.set_button_text_align([0.5, 0.5]);
 

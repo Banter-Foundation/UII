@@ -30,7 +30,7 @@ The window opens on an empty document. Nothing is seeded.
 
 The top of the window has three tabs:
 
-- **Design** is the layout canvas. Layers stay on the left and properties stay on the right: position, size, fill, and type. Text uses its font size. Rectangles and frames have a fill and a corner radius. Frames clip their children and can nest.
+- **Design** is the layout canvas, and it is the tab that opens. A slim toolbar holds the tools, zoom, and undo. Layers stay on the left and properties stay on the right: position, size, fill, type, corner radius, and font size. The canvas is a neutral surface with a clear selection. Assets and Components stay in the collapsible bottom dock. Text uses its font size. Rectangles and frames have a fill and a corner radius. Frames clip their children and can nest.
 - **Animation** is the same canvas plus the animation host: clips, property tracks, a timeline, and a motion preview. The clip file is `animation.json` (`UII_ANIMATION_PATH` overrides it). Playing a clip does not write the sampled pose back over the design.
 - **Function** is the behavior graph. Save writes `function.graph` under the UII data directory.
 

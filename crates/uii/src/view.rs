@@ -1,9 +1,13 @@
-//! The window. Design, Animation, and Function are the top tabs. Layers and
-//! properties stay on screen while designing. Inspect is a tool. Assets and
-//! Components live in the collapsible content drawer. HTML and CSS stay closed
-//! until they are opened.
+//! The window. A slim toolbar holds the tools, zoom, and undo. Design,
+//! Animation, and Function are the tabs, and Design is the one that opens.
+//! Layers stay on the left. Properties stay on the right. The canvas is the
+//! neutral surface in the middle. Assets and Components live in the
+//! collapsible bottom dock. HTML and CSS stay closed until they are opened.
 
-use dear_imgui_rs::{Condition, DrawListMut, DrawSegmentCount, Key, MouseButton, Ui, WindowFlags};
+use dear_imgui_rs::{
+    Condition, DrawListMut, DrawSegmentCount, Key, MouseButton, StyleColor, StyleVar, Ui,
+    WindowFlags,
+};
 use uii_core::{
     command_for, export_source, import_source, library_file_path, parse_hex_color, read_library,
     resize_from_handle, shortcuts, write_library, AssetKind, Bind, BindKey, Command, DrawerPage,
@@ -184,7 +188,9 @@ impl View {
                     | WindowFlags::NO_RESIZE
                     | WindowFlags::NO_MOVE
                     | WindowFlags::NO_COLLAPSE
-                    | WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS,
+                    | WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS
+                    | WindowFlags::NO_SCROLLBAR
+                    | WindowFlags::NO_SCROLL_WITH_MOUSE,
             )
             .build(|| {
                 let chord = ui.io().key_ctrl() && ui.is_key_down(Key::Space);
@@ -234,25 +240,57 @@ impl View {
     }
 
     fn workspace(&mut self, ui: &Ui, editor: &mut Editor, dt: f32) {
-        if let Some(_bar) = ui.tab_bar("workspace") {
-            if let Some(_tab) = ui.tab_item("Design") {
-                editor.set_tab(WorkspaceTab::Design);
-                self.workspace_body(ui, editor, dt, false);
-            }
-            if let Some(_tab) = ui.tab_item("Animation") {
-                editor.set_tab(WorkspaceTab::Animation);
-                self.workspace_body(ui, editor, dt, true);
-            }
-            if let Some(_tab) = ui.tab_item("Function") {
-                editor.set_tab(WorkspaceTab::Function);
+        self.tab_row(ui, editor);
+        hairline(ui, "rule-tabs");
+        match editor.tab() {
+            WorkspaceTab::Design => self.workspace_body(ui, editor, dt, false),
+            WorkspaceTab::Animation => self.workspace_body(ui, editor, dt, true),
+            WorkspaceTab::Function => self.function_body(ui, editor),
+        }
+    }
+
+    fn tab_row(&mut self, ui: &Ui, editor: &mut Editor) {
+        let width = ui.content_region_avail()[0];
+        let bg = ui.push_style_color(StyleColor::ChildBg, crate::theme::CHROME);
+        let pad = ui.push_style_var(StyleVar::WindowPadding([crate::theme::INSET, 5.0]));
+        ui.child_window("tabs")
+            .size([width, crate::theme::TAB_H])
+            .border(false)
+            .flags(WindowFlags::NO_SCROLLBAR)
+            .build(ui, || {
+                for tab in Editor::tabs() {
+                    let on = editor.tab() == tab;
+                    if tool_button(ui, &format!("{}##tab", tab.label()), on) {
+                        editor.set_tab(tab);
+                    }
+                    ui.same_line();
+                }
+            });
+        pad.pop();
+        bg.pop();
+    }
+
+    fn function_body(&mut self, ui: &Ui, editor: &mut Editor) {
+        let avail = ui.content_region_avail();
+        let body_h = (avail[1] - self.dock_reserve(editor) - self.status_reserve()).max(120.0);
+        let bg = ui.push_style_color(StyleColor::ChildBg, crate::theme::PANEL);
+        let pad = ui.push_style_var(StyleVar::WindowPadding([
+            crate::theme::INSET,
+            crate::theme::INSET,
+        ]));
+        ui.child_window("function-body")
+            .size([avail[0], body_h])
+            .border(false)
+            .build(ui, || {
                 if uii_function::draw_function_panel(ui, &mut self.functions) {
                     if let Err(err) = self.functions.save() {
                         self.status = err;
                     }
                 }
-                self.drawer(ui, editor);
-            }
-        }
+            });
+        pad.pop();
+        bg.pop();
+        self.dock_and_status(ui, editor);
     }
 
     fn workspace_body(&mut self, ui: &Ui, editor: &mut Editor, dt: f32, animate: bool) {
@@ -260,6 +298,7 @@ impl View {
             editor.tick(dt);
         }
         self.toolbar(ui, editor);
+        hairline(ui, "rule-tools");
         if editor.tool() == uii_core::Tool::Inspect {
             self.inspect_strip(ui, editor);
         }
@@ -268,101 +307,165 @@ impl View {
         }
 
         let avail = ui.content_region_avail();
-        let drawer_body = if editor.drawer_collapsed() {
-            0.0
+        let timeline = if animate {
+            crate::theme::TIMELINE_H
         } else {
-            260.0
+            0.0
         };
-        let timeline = if animate { 300.0 } else { 0.0 };
-        let body_h = (avail[1] - drawer_body - timeline - 32.0).max(120.0);
+        let body_h =
+            (avail[1] - self.dock_reserve(editor) - timeline - self.status_reserve()).max(120.0);
+        let columns = ui.push_style_color(StyleColor::ChildBg, crate::theme::DIVIDER);
+        let column_pad = ui.push_style_var(StyleVar::WindowPadding([0.0, 0.0]));
+        let column_gap = ui.push_style_var(StyleVar::ItemSpacing([1.0, 0.0]));
         ui.child_window("workspace-body")
             .size([avail[0], body_h])
             .border(false)
             .flags(WindowFlags::NO_SCROLLBAR)
             .build(ui, || {
                 let inner = ui.content_region_avail();
-                let layers_w = 200.0;
-                let props_w = 250.0;
-                ui.child_window("layers")
-                    .size([layers_w, inner[1]])
-                    .border(true)
-                    .build(ui, || {
-                        ui.text("Layers");
-                        let roots = editor.document().roots().to_vec();
-                        self.layers(ui, editor, &roots, 0);
-                    });
+                let layers_w = crate::theme::LAYERS_W;
+                let props_w = crate::theme::PROPS_W;
+                side_column(ui, "layers", [layers_w, inner[1]], || {
+                    ui.text("Layers");
+                    let roots = editor.document().roots().to_vec();
+                    if roots.is_empty() {
+                        ui.text_disabled("No layers yet");
+                    }
+                    self.layers(ui, editor, &roots, 0);
+                });
                 ui.same_line();
-                let canvas_w = (inner[0] - layers_w - props_w - 16.0).max(80.0);
+                let canvas_w = (inner[0] - layers_w - props_w - 2.0).max(80.0);
+                let canvas_bg = ui.push_style_color(StyleColor::ChildBg, crate::theme::CANVAS);
+                let canvas_pad = ui.push_style_var(StyleVar::WindowPadding([0.0, 0.0]));
                 ui.child_window("canvas")
                     .size([canvas_w, inner[1]])
-                    .border(true)
+                    .border(false)
                     .flags(WindowFlags::NO_SCROLLBAR)
                     .build(ui, || {
                         self.canvas(ui, editor, animate);
                     });
+                canvas_pad.pop();
+                canvas_bg.pop();
                 ui.same_line();
-                ui.child_window("properties")
-                    .size([props_w, inner[1]])
-                    .border(true)
-                    .build(ui, || {
-                        self.properties(ui, editor);
-                        ui.separator();
-                        self.shortcut_list(ui, editor);
-                    });
+                side_column(ui, "properties", [props_w, inner[1]], || {
+                    self.properties(ui, editor);
+                    ui.separator();
+                    self.shortcut_list(ui, editor);
+                });
             });
+        column_gap.pop();
+        column_pad.pop();
+        columns.pop();
 
         if animate {
-            self.animation_host(ui, editor, dt);
+            let host_bg = ui.push_style_color(StyleColor::ChildBg, crate::theme::PANEL);
+            let host_pad = ui.push_style_var(StyleVar::WindowPadding([crate::theme::INSET, 8.0]));
+            ui.child_window("animation-host")
+                .size([ui.content_region_avail()[0], crate::theme::TIMELINE_H])
+                .border(false)
+                .build(ui, || {
+                    self.animation_host(ui, editor, dt);
+                });
+            host_pad.pop();
+            host_bg.pop();
         }
+        self.dock_and_status(ui, editor);
+    }
+
+    fn dock_reserve(&self, editor: &Editor) -> f32 {
+        if editor.drawer_collapsed() {
+            crate::theme::DOCK_BAR
+        } else {
+            crate::theme::DOCK_BAR + crate::theme::DOCK_BODY
+        }
+    }
+
+    fn status_reserve(&self) -> f32 {
+        if self.status.is_empty() {
+            0.0
+        } else {
+            22.0
+        }
+    }
+
+    fn dock_and_status(&mut self, ui: &Ui, editor: &mut Editor) {
         self.drawer(ui, editor);
         if ui.is_mouse_clicked(MouseButton::Left) && !self.drawer_hovered {
             editor.dismiss_unpinned_drawer();
         }
         if !self.status.is_empty() {
-            ui.text(&self.status);
+            ui.text_colored(crate::theme::MUTED, &self.status);
         }
     }
 
     fn toolbar(&mut self, ui: &Ui, editor: &mut Editor) {
-        let tools = Editor::tools();
-        for (index, tool) in tools.iter().enumerate() {
-            if index > 0 {
+        let width = ui.content_region_avail()[0];
+        let bg = ui.push_style_color(StyleColor::ChildBg, crate::theme::CHROME);
+        let pad = ui.push_style_var(StyleVar::WindowPadding([crate::theme::INSET, 7.0]));
+        ui.child_window("toolbar")
+            .size([width, crate::theme::TOOLBAR_H])
+            .border(false)
+            .flags(WindowFlags::NO_SCROLLBAR)
+            .build(ui, || {
+                let tools = Editor::tools();
+                for (index, tool) in tools.iter().enumerate() {
+                    if index > 0 {
+                        ui.same_line();
+                    }
+                    let label = format!("{}##tool{index}", tool.label());
+                    if tool_button(ui, &label, editor.tool() == *tool) {
+                        editor.set_tool(*tool);
+                    }
+                }
                 ui.same_line();
-            }
-            let active = editor.tool() == *tool;
-            let label = if active {
-                format!("[{}]##tool{index}", tool.label())
-            } else {
-                format!("{}##tool{index}", tool.label())
-            };
-            if ui.button(&label) {
-                editor.set_tool(*tool);
-            }
-        }
-        ui.same_line();
-        if ui.button("Delete") {
-            editor.delete_selected();
-        }
-        ui.same_line();
-        if ui.button("Import") {
-            self.import_open = true;
-        }
-        ui.same_line();
-        if ui.button("Export") {
-            self.export_open = true;
-            self.refresh_export(editor);
-        }
-        ui.same_line();
-        let markup = if self.markup_open {
-            "Hide HTML / CSS"
-        } else {
-            "HTML / CSS"
-        };
-        if ui.button(markup) {
-            self.markup_open = !self.markup_open;
-        }
-        ui.same_line();
-        ui.text(format!("{:.0}%", editor.zoom() * 100.0));
+                if tool_button(ui, "Delete", false) {
+                    editor.delete_selected();
+                }
+                ui.same_line();
+                if tool_button(ui, "Import", false) {
+                    self.import_open = true;
+                }
+                ui.same_line();
+                if tool_button(ui, "Export", false) {
+                    self.export_open = true;
+                    self.refresh_export(editor);
+                }
+                ui.same_line();
+                let markup = if self.markup_open { "HTML on" } else { "HTML" };
+                if tool_button(ui, markup, self.markup_open) {
+                    self.markup_open = !self.markup_open;
+                }
+
+                ui.same_line();
+                let cluster = ui.window_size()[0] - 348.0;
+                if cluster > ui.cursor_pos()[0] + 8.0 {
+                    ui.set_cursor_pos_x(cluster);
+                }
+                if tool_button(ui, "-##zoom-out", false) {
+                    editor.zoom_out();
+                }
+                ui.same_line();
+                ui.align_text_to_frame_padding();
+                ui.text(format!("{:.0}%", editor.zoom() * 100.0));
+                ui.same_line();
+                if tool_button(ui, "+##zoom-in", false) {
+                    editor.zoom_in();
+                }
+                ui.same_line();
+                if tool_button(ui, "Fit", false) {
+                    editor.fit(self.canvas_size[0], self.canvas_size[1]);
+                }
+                ui.same_line();
+                if tool_button(ui, "Undo", false) {
+                    editor.undo();
+                }
+                ui.same_line();
+                if tool_button(ui, "Redo", false) {
+                    editor.redo();
+                }
+            });
+        pad.pop();
+        bg.pop();
     }
 
     fn inspect_strip(&mut self, ui: &Ui, editor: &Editor) {
@@ -379,7 +482,7 @@ impl View {
         ui.text("Properties");
         let count = editor.selection().len();
         if count > 1 {
-            ui.text(format!("{count} selected"));
+            ui.text_disabled(format!("{count} selected"));
         }
         let id = editor.selected();
         if !self.props_editing || self.props_id != id.map(|id| id.0) {
@@ -396,39 +499,60 @@ impl View {
         }
         self.props_editing = false;
         let Some(id) = id else {
-            ui.text("Nothing selected");
+            ui.text_disabled("Nothing selected");
             return;
         };
         let kind = editor.document().node(id).kind;
-        ui.text(format!("Type  {}", kind));
-        if ui.input_float("X", &mut self.prop_x) {
+        ui.text_disabled("Type");
+        ui.same_line();
+        ui.text(format!("{kind}"));
+        section_label(ui, "Position");
+        let (x_changed, y_changed) = float_pair(
+            ui,
+            "X",
+            "##x",
+            &mut self.prop_x,
+            "Y",
+            "##y",
+            &mut self.prop_y,
+            &mut self.props_editing,
+        );
+        if x_changed {
             editor.move_node(id, self.prop_x, editor.document().node(id).rect.y);
             editor.finish_edit();
             self.props_editing = true;
         }
-        self.note_active(ui);
-        if ui.input_float("Y", &mut self.prop_y) {
+        if y_changed {
             editor.move_node(id, editor.document().node(id).rect.x, self.prop_y);
             editor.finish_edit();
             self.props_editing = true;
         }
-        self.note_active(ui);
-        if ui.input_float("W", &mut self.prop_w) {
+        section_label(ui, "Size");
+        let (w_changed, h_changed) = float_pair(
+            ui,
+            "W",
+            "##w",
+            &mut self.prop_w,
+            "H",
+            "##h",
+            &mut self.prop_h,
+            &mut self.props_editing,
+        );
+        if w_changed {
             editor.resize_node(id, self.prop_w, editor.document().node(id).rect.height);
             editor.finish_edit();
             self.props_editing = true;
         }
-        self.note_active(ui);
-        if ui.input_float("H", &mut self.prop_h) {
+        if h_changed {
             editor.resize_node(id, editor.document().node(id).rect.width, self.prop_h);
             editor.finish_edit();
             self.props_editing = true;
         }
-        self.note_active(ui);
-        ui.text("Fill");
+        section_label(ui, "Fill");
         let swatch = editor.document().node(id).fill;
         ui.color_button("##fill", color(swatch));
         ui.same_line();
+        ui.set_next_item_width(ui.content_region_avail()[0]);
         if ui.input_text("##fill-hex", &mut self.prop_fill).build() {
             if let Some(parsed) = parse_hex_color(&self.prop_fill) {
                 editor.set_fill(id, parsed);
@@ -437,24 +561,30 @@ impl View {
             self.props_editing = true;
         }
         self.note_active(ui);
-        if matches!(kind, NodeKind::Text | NodeKind::Button)
-            && ui.input_float("Font", &mut self.prop_font)
-        {
-            editor.set_font_size(id, self.prop_font);
-            editor.finish_edit();
-            self.props_editing = true;
+        if matches!(kind, NodeKind::Text | NodeKind::Button) {
+            section_label(ui, "Font size");
+            if labeled_float(ui, "##font", &mut self.prop_font, &mut self.props_editing) {
+                editor.set_font_size(id, self.prop_font);
+                editor.finish_edit();
+                self.props_editing = true;
+            }
         }
-        self.note_active(ui);
         if matches!(
             kind,
             NodeKind::Rectangle | NodeKind::Frame | NodeKind::Child | NodeKind::Dock
-        ) && ui.input_float("Radius", &mut self.prop_radius)
-        {
-            editor.set_corner_radius(id, self.prop_radius);
-            editor.finish_edit();
-            self.props_editing = true;
+        ) {
+            section_label(ui, "Corner radius");
+            if labeled_float(
+                ui,
+                "##radius",
+                &mut self.prop_radius,
+                &mut self.props_editing,
+            ) {
+                editor.set_corner_radius(id, self.prop_radius);
+                editor.finish_edit();
+                self.props_editing = true;
+            }
         }
-        self.note_active(ui);
     }
 
     fn note_active(&mut self, ui: &Ui) {
@@ -464,11 +594,18 @@ impl View {
     }
 
     fn shortcut_list(&mut self, ui: &Ui, editor: &Editor) {
-        ui.text("Shortcuts");
+        section_label(ui, "Shortcuts");
         for shortcut in shortcuts() {
-            ui.text(format!("{}   {}", shortcut.keys, shortcut.label));
+            ui.text(shortcut.label);
+            let keys_w = ui.calc_text_size(shortcut.keys)[0];
+            ui.same_line();
+            let edge = ui.window_size()[0] - keys_w - crate::theme::INSET;
+            if edge > ui.cursor_pos()[0] {
+                ui.set_cursor_pos_x(edge);
+            }
+            ui.text_disabled(shortcut.keys);
         }
-        ui.text(format!("Zoom {:.0}%", editor.zoom() * 100.0));
+        ui.text_disabled(format!("Zoom {:.0}%", editor.zoom() * 100.0));
     }
 
     fn markup_panel(&mut self, ui: &Ui, editor: &mut Editor) {
@@ -509,12 +646,13 @@ impl View {
             };
             let selected = editor.selection().contains(id);
             let pad = "  ".repeat(depth);
-            let text = if selected {
-                format!("{pad}> {label}")
-            } else {
-                format!("{pad}{label}")
-            };
-            if ui.button(&text) {
+            let text = format!("{pad}{label}");
+            if ui
+                .selectable_config(&text)
+                .selected(selected)
+                .size([0.0, crate::theme::ROW_H])
+                .build()
+            {
                 if ui.io().key_shift() {
                     editor.toggle_in_selection(*id);
                 } else {
@@ -530,6 +668,19 @@ impl View {
     fn canvas(&mut self, ui: &Ui, editor: &mut Editor, animate: bool) {
         let size = ui.content_region_avail();
         self.canvas_size = size;
+        {
+            let origin = ui.window_pos();
+            let extent = ui.window_size();
+            let backdrop = ui.get_window_draw_list();
+            backdrop
+                .add_rect(
+                    origin,
+                    [origin[0] + extent[0], origin[1] + extent[1]],
+                    crate::theme::CANVAS,
+                )
+                .filled(true)
+                .build();
+        }
         let origin = ui.get_cursor_screen_pos();
         ui.invisible_button("canvas-hit", size);
         let hovered = ui.is_item_hovered();
@@ -764,7 +915,9 @@ impl View {
             let rect = drag_rect(start, local);
             let a = screen_point(origin, pan, zoom, rect.x, rect.y);
             let b = screen_point(origin, pan, zoom, rect.x + rect.width, rect.y + rect.height);
-            draw.add_rect(a, b, [0.35, 0.55, 1.0, 1.0]).build();
+            draw.add_rect(a, b, crate::theme::ACCENT)
+                .thickness(1.5)
+                .build();
         }
         for guide in &self.guides {
             if guide.vertical {
@@ -772,7 +925,7 @@ impl View {
                 draw.add_line(
                     [x, origin[1]],
                     [x, origin[1] + 4000.0],
-                    [0.95, 0.35, 0.45, 0.9],
+                    crate::theme::ACCENT,
                 )
                 .build();
             } else {
@@ -780,7 +933,7 @@ impl View {
                 draw.add_line(
                     [origin[0], y],
                     [origin[0] + 4000.0, y],
-                    [0.95, 0.35, 0.45, 0.9],
+                    crate::theme::ACCENT,
                 )
                 .build();
             }
@@ -868,71 +1021,82 @@ impl View {
                 draw.add_rect(
                     [min[0] - 1.0, min[1] - 1.0],
                     [max[0] + 1.0, max[1] + 1.0],
-                    [0.24, 0.49, 1.0, 1.0],
+                    crate::theme::ACCENT,
                 )
+                .thickness(2.0)
                 .build();
                 for (_, point) in handles(rect) {
                     let at = screen_point(origin, pan, zoom, point[0], point[1]);
+                    let half = 4.0;
                     draw.add_rect_filled_multicolor(
-                        [at[0] - 3.0, at[1] - 3.0],
-                        [at[0] + 3.0, at[1] + 3.0],
-                        [0.24, 0.49, 1.0, 1.0],
-                        [0.24, 0.49, 1.0, 1.0],
-                        [0.24, 0.49, 1.0, 1.0],
-                        [0.24, 0.49, 1.0, 1.0],
+                        [at[0] - half, at[1] - half],
+                        [at[0] + half, at[1] + half],
+                        crate::theme::WHITE,
+                        crate::theme::WHITE,
+                        crate::theme::WHITE,
+                        crate::theme::WHITE,
                     );
+                    draw.add_rect(
+                        [at[0] - half, at[1] - half],
+                        [at[0] + half, at[1] + half],
+                        crate::theme::ACCENT,
+                    )
+                    .thickness(1.5)
+                    .build();
                 }
             }
         }
     }
 
     fn drawer(&mut self, ui: &Ui, editor: &mut Editor) {
-        ui.separator();
         let cursor = ui.cursor_screen_pos();
-        let toggle = if editor.drawer_collapsed() {
-            "Content  >"
-        } else {
-            "Content  v"
-        };
-        if ui.button(toggle) {
-            editor.toggle_drawer();
-        }
-        ui.same_line();
-        let pin = if editor.drawer_pinned() {
-            "Pinned"
-        } else {
-            "Pin"
-        };
-        if ui.button(pin) {
-            editor.set_drawer_pinned(!editor.drawer_pinned());
-        }
+        let width = ui.content_region_avail()[0];
+        let collapsed = editor.drawer_collapsed();
+        let pinned = editor.drawer_pinned();
+        let bg = ui.push_style_color(StyleColor::ChildBg, crate::theme::CHROME);
+        let pad = ui.push_style_var(StyleVar::WindowPadding([crate::theme::INSET, 5.0]));
+        ui.child_window("dock-bar")
+            .size([width, crate::theme::DOCK_BAR])
+            .border(false)
+            .flags(WindowFlags::NO_SCROLLBAR)
+            .build(ui, || {
+                let toggle = if collapsed { "Dock  >" } else { "Dock  v" };
+                if tool_button(ui, toggle, !collapsed) {
+                    editor.toggle_drawer();
+                }
+                ui.same_line();
+                let pin = if pinned { "Pinned" } else { "Pin" };
+                if tool_button(ui, pin, pinned) {
+                    editor.set_drawer_pinned(!pinned);
+                }
+                for page in Editor::drawer_pages() {
+                    ui.same_line();
+                    let current = editor.drawer_page() == page && !collapsed;
+                    if tool_button(ui, &format!("{}##dock", page.label()), current) {
+                        editor.show_drawer(page);
+                    }
+                }
+            });
+        pad.pop();
+        bg.pop();
         if editor.drawer_collapsed() {
             let after = ui.cursor_screen_pos();
-            self.drawer_hovered =
-                point_in(ui.mouse_pos(), cursor, after[0] + 400.0, after[1] + 24.0);
+            self.drawer_hovered = point_in(ui.mouse_pos(), cursor, cursor[0] + width, after[1]);
             return;
         }
-        ui.same_line();
-        for page in Editor::drawer_pages() {
-            let current = editor.drawer_page() == page;
-            let label = if current {
-                format!("[{}]##drawer{}", page.label(), page.label())
-            } else {
-                format!("{}##drawer{}", page.label(), page.label())
-            };
-            if ui.button(&label) {
-                editor.show_drawer(page);
-            }
-            ui.same_line();
-        }
-        ui.new_line();
-        match editor.drawer_page() {
-            DrawerPage::Assets => self.assets(ui, editor),
-            DrawerPage::Components => self.components(ui, editor),
-        }
+        let body_bg = ui.push_style_color(StyleColor::ChildBg, crate::theme::PANEL);
+        let body_pad = ui.push_style_var(StyleVar::WindowPadding([crate::theme::INSET, 8.0]));
+        ui.child_window("dock-body")
+            .size([width, crate::theme::DOCK_BODY])
+            .border(false)
+            .build(ui, || match editor.drawer_page() {
+                DrawerPage::Assets => self.assets(ui, editor),
+                DrawerPage::Components => self.components(ui, editor),
+            });
+        body_pad.pop();
+        body_bg.pop();
         let end = ui.cursor_screen_pos();
-        let width = ui.content_region_avail()[0] + 200.0;
-        self.drawer_hovered = point_in(ui.mouse_pos(), cursor, cursor[0] + width, end[1] + 8.0);
+        self.drawer_hovered = point_in(ui.mouse_pos(), cursor, cursor[0] + width, end[1]);
     }
 
     fn assets(&mut self, ui: &Ui, editor: &mut Editor) {
@@ -1297,6 +1461,108 @@ fn drag_rect(start: [f32; 2], end: [f32; 2]) -> Rect {
     let x = start[0].min(end[0]);
     let y = start[1].min(end[1]);
     Rect::new(x, y, (end[0] - start[0]).abs(), (end[1] - start[1]).abs())
+}
+
+fn side_column(ui: &Ui, name: &str, size: [f32; 2], body: impl FnOnce()) {
+    let bg = ui.push_style_color(StyleColor::ChildBg, crate::theme::PANEL);
+    let pad = ui.push_style_var(StyleVar::WindowPadding([
+        crate::theme::INSET,
+        crate::theme::INSET,
+    ]));
+    let gap = ui.push_style_var(StyleVar::ItemSpacing([8.0, 6.0]));
+    ui.child_window(name)
+        .size(size)
+        .border(false)
+        .build(ui, body);
+    gap.pop();
+    pad.pop();
+    bg.pop();
+}
+
+fn hairline(ui: &Ui, id: &str) {
+    let width = ui.content_region_avail()[0];
+    let color = ui.push_style_color(StyleColor::ChildBg, crate::theme::DIVIDER);
+    let pad = ui.push_style_var(StyleVar::WindowPadding([0.0, 0.0]));
+    ui.child_window(id)
+        .size([width, 1.0])
+        .border(false)
+        .flags(WindowFlags::NO_SCROLLBAR)
+        .build(ui, || {});
+    pad.pop();
+    color.pop();
+}
+
+fn section_label(ui: &Ui, title: &str) {
+    ui.dummy([0.0, 2.0]);
+    ui.text_disabled(title);
+}
+
+fn float_pair(
+    ui: &Ui,
+    left_label: &str,
+    left_id: &str,
+    left: &mut f32,
+    right_label: &str,
+    right_id: &str,
+    right: &mut f32,
+    editing: &mut bool,
+) -> (bool, bool) {
+    let field = ((ui.content_region_avail()[0] - 52.0) * 0.5).max(36.0);
+    ui.align_text_to_frame_padding();
+    ui.text(left_label);
+    ui.same_line();
+    ui.set_next_item_width(field);
+    let left_changed = ui.input_float(left_id, left);
+    if ui.is_item_active() {
+        *editing = true;
+    }
+    ui.same_line();
+    ui.align_text_to_frame_padding();
+    ui.text(right_label);
+    ui.same_line();
+    ui.set_next_item_width(field);
+    let right_changed = ui.input_float(right_id, right);
+    if ui.is_item_active() {
+        *editing = true;
+    }
+    (left_changed, right_changed)
+}
+
+fn labeled_float(ui: &Ui, id: &str, value: &mut f32, editing: &mut bool) -> bool {
+    ui.set_next_item_width(ui.content_region_avail()[0]);
+    let changed = ui.input_float(id, value);
+    if ui.is_item_active() {
+        *editing = true;
+    }
+    changed
+}
+
+fn tool_button(ui: &Ui, label: &str, active: bool) -> bool {
+    let fill = if active {
+        crate::theme::ACCENT
+    } else {
+        crate::theme::TOOL
+    };
+    let hover = if active {
+        crate::theme::ACCENT_HOVER
+    } else {
+        crate::theme::HOVER
+    };
+    let text = if active {
+        crate::theme::WHITE
+    } else {
+        crate::theme::TEXT
+    };
+    let button = ui.push_style_color(StyleColor::Button, fill);
+    let hovered = ui.push_style_color(StyleColor::ButtonHovered, hover);
+    let pressed = ui.push_style_color(StyleColor::ButtonActive, crate::theme::ACCENT);
+    let ink = ui.push_style_color(StyleColor::Text, text);
+    let hit = ui.button(label);
+    ink.pop();
+    pressed.pop();
+    hovered.pop();
+    button.pop();
+    hit
 }
 
 fn default_size(kind: NodeKind) -> (f32, f32) {

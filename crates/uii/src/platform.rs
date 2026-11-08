@@ -39,6 +39,8 @@ pub fn run() -> Result<(), String> {
         let io = imgui.io_mut();
         io.set_config_flags(io.config_flags() | ConfigFlags::DOCKING_ENABLE);
     }
+    crate::theme::load_font(imgui.font_atlas());
+    crate::theme::apply(imgui.style_mut());
     let mut renderer = GlowRenderer::with_shared_context(Rc::clone(&gl), &mut imgui)
         .map_err(|err| format!("imgui renderer: {err}"))?;
 
@@ -82,7 +84,8 @@ pub fn run() -> Result<(), String> {
         }
 
         unsafe {
-            gl.clear_color(0.12, 0.12, 0.13, 1.0);
+            let clear = crate::theme::clear_color();
+            gl.clear_color(clear[0], clear[1], clear[2], 1.0);
             gl.clear(glow::COLOR_BUFFER_BIT);
         }
         let ui = imgui.frame();

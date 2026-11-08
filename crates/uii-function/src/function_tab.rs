@@ -83,6 +83,12 @@ impl Session {
     }
 }
 
+/// Draw the graph inside the shell's Function tab. The caller owns the window.
+pub fn draw_function_panel(ui: &Ui, session: &mut Session) -> bool {
+    session.editor.retain_selection();
+    draw_function(ui, session)
+}
+
 pub fn draw_function_tab(ui: &Ui, session: &mut Session) -> bool {
     if !session.styled {
         ui.style_colors_dark();

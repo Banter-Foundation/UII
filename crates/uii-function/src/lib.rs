@@ -24,6 +24,6 @@ mod function_tab;
 mod platform;
 
 #[cfg(feature = "desktop")]
-pub use function_tab::{draw_function_tab, Session};
+pub use function_tab::{draw_function_panel, draw_function_tab, Session};
 #[cfg(feature = "desktop")]
 pub use platform::run;

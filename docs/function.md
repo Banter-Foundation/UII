@@ -9,11 +9,11 @@ This crate does not draw Design, Animation, the assets dock, Inspect, import/exp
 Workspace member `crates/uii-function`, package `uii-function`.
 
 - `cargo test -p uii-function` builds the graph, the editor, and the file format. It does not link GLFW.
-- `cargo run -p uii-function --features desktop --bin uii` opens the window. The binary is `uii`.
+- The Function tab is drawn inside the UII window (`cargo run -p uii`). This crate does not ship a second `uii` binary.
 
 Public types: `Graph`, `Function`, `FunctionId`, `FunctionKind`, `Port`, `PortId`, `Direction`, `Connection`, `ConnectionId`, `EditError`, `Editor`, `Camera`, `Hit`, `Rect`. File helpers: `to_text`, `from_text`, `default_graph_path`, `StoreError`.
 
-With the `desktop` feature the crate also exports `Session`, `draw_function_tab`, and `run`.
+With the `desktop` feature the crate also exports `Session`, `draw_function_panel`, `draw_function_tab`, and `run`. The shell calls `draw_function_panel`.
 
 ## Graph
 

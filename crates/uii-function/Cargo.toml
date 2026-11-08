@@ -3,6 +3,7 @@ name = "uii-function"
 version = "0.1.0"
 edition = "2021"
 description = "UII Function tab: how and where things work, and how they connect."
+autobins = false
 
 [features]
 desktop = ["dep:dear-imgui-glow", "dep:dear-imgui-rs", "dep:glfw", "dep:glow"]
@@ -12,8 +13,3 @@ dear-imgui-glow = { version = "0.22", optional = true }
 dear-imgui-rs = { version = "0.22", optional = true }
 glow = { version = "0.18", optional = true }
 glfw = { version = "0.63", optional = true }
-
-[[bin]]
-name = "uii"
-path = "src/bin/uii.rs"
-required-features = ["desktop"]
